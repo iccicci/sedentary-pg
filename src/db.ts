@@ -1,29 +1,20 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Pool, PoolConfig } from "pg";
+import { DB as DB_ } from "sedentary/src/db";
 
-import { promises } from "fs";
+export class DB extends DB_ {
+  private pg: Pool;
 
-const { readFile } = promises;
-
-export class DB {
-  private body: any;
-  private file: string;
-
-  constructor(filename: string | null) {
-    this.file = filename;
+  constructor(connection: PoolConfig) {
+    super("");
+    this.pg = new Pool(connection);
   }
 
   async connect(): Promise<void> {
-    this.body = {};
-
-    if(this.file !== "test.db") {
-      try {
-        this.body = (await readFile(this.file)).toJSON();
-      } catch(e) {
-        if(e.code !== "ENOENT") throw e;
-      }
-    }
+    const client = await this.pg.connect();
+    client.release();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
-  async end(): Promise<void> {}
+  async end(): Promise<void> {
+    await this.pg.end();
+  }
 }
