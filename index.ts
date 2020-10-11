@@ -1,12 +1,12 @@
 import { SchemaOptions, Sedentary } from "sedentary";
 import { PoolConfig } from "pg";
 
-import { DB } from "./src/db";
+import { PGDB } from "./lib/pgdb";
 
 export class SedentaryPG extends Sedentary {
   constructor(connection: PoolConfig, options?: SchemaOptions) {
     super("", options);
-    this.db = new DB(connection);
+    this.db = new PGDB(connection, this.log);
   }
 }
 

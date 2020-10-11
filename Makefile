@@ -160,19 +160,19 @@ setup: package-lock.json .gitignore .npmignore .travis.yml
 test: setup rm
 	npm test
 ifeq (${PACKAGE}, sedentary)
-	for i in ${EXTENSIONS} ; do make -C $$i test ; done
+	for i in ${EXTENSIONS} ; do make  --always-make --debug --dry-run -C $$i test ; done
 endif
 
 version: setup
 	@if [ -z "${VERSION}" ] ; then echo "Missing VERSION!" ; exit 1 ; fi
 	npm run version
 	npm install --prune
-	make commit MESSAGE=V${VERSION}
+	make commit MESSAGE=${VERSION}
 	make push
-	git tag V${VERSION}
+	git tag v${VERSION}
 	git push --tags
 	npm run tsc
-	-npm publish
+	npm publish
 ifeq (${PACKAGE}, sedentary)
 	sleep 30
 	for i in ${EXTENSIONS} ; do make -C $$i version ; done

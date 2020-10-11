@@ -34,3 +34,5 @@
 [types-badge]: https://badgen.net/npm/types/sedentary-pg?color=green&icon=typescript
 
 # under development
+
+https://bucardo.org/postgres_all_versions.html
