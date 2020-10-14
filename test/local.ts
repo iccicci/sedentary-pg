@@ -22,10 +22,22 @@ export async function clean(): Promise<void> {
   };
 
   await drop("TABLE test1s");
+  await drop("TABLE test2s");
+  await drop("TABLE test3s");
   await drop("SEQUENCE test1s_id_seq");
+  await drop("SEQUENCE test2s_id_seq");
+  await drop("SEQUENCE test3s_id_seq");
 
   client.release();
   await pool.end();
 }
 
-export const expected = { sync_create_table: ["CREATE SEQUENCE test1s_id_seq", "CREATE TABLE test1s ()"] };
+export const expected = {
+  sync_create_table:               ["CREATE SEQUENCE test1s_id_seq", "CREATE TABLE test1s ()"],
+  sync_create_table_exists:        [""],
+  sync_create_table_parent:        ["CREATE TABLE test3s () INHERITS (test1s)"],
+  sync_create_table_parent_add:    ["DROP TABLE test3s CASCADE", "CREATE TABLE test3s () INHERITS (test1s)"],
+  sync_create_table_parent_change: ["DROP TABLE test3s CASCADE", "CREATE TABLE test3s () INHERITS (test2s)"],
+  sync_create_table_parent_remove: ["CREATE SEQUENCE test3s_id_seq", "DROP TABLE test3s CASCADE", "CREATE TABLE test3s ()"],
+  sync_create_table_pk:            ["CREATE TABLE test2s ()"]
+};

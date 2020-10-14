@@ -54,14 +54,41 @@ export class PGDB extends DB {
       })();
     }
 
-    const res = await this.client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
+    let create: boolean;
+    const resTable = await this.client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
 
-    if(! res.rowCount) {
+    if(resTable.rowCount) {
+      table.oid = resTable.rows[0].oid;
+
+      let drop: boolean;
+      const resParent = await this.client.query("SELECT inhparent FROM pg_inherits WHERE inhrelid = $1", [table.oid]);
+
+      if(resParent.rowCount) {
+        if(! table.parent) drop = true;
+        else if(this.tables[table.parent.tableName].oid === resParent.rows[0].inhparent) return;
+
+        drop = true;
+      } else if(table.parent) drop = true;
+
+      if(drop) {
+        const statement = `DROP TABLE ${table.tableName} CASCADE`;
+
+        create = true;
+        this.log(statement);
+        await this.client.query(statement);
+      }
+    } else create = true;
+
+    if(create) {
       const parent = table.parent ? ` INHERITS (${table.parent.tableName})` : "";
       const statement = `CREATE TABLE ${table.tableName} ()${parent}`;
 
       this.log(statement);
       await this.client.query(statement);
+
+      const resTable = await this.client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
+
+      table.oid = resTable.rows[0].oid;
     }
   }
 }
