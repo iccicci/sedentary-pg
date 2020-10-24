@@ -1,5 +1,5 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
-import { DB, Table } from "sedentary/lib/db";
+import { DB, Field, Table, native } from "sedentary/lib/db";
 
 export class PGDB extends DB {
   private client: PoolClient;
@@ -14,6 +14,10 @@ export class PGDB extends DB {
   async connect(): Promise<void> {
     this.client = await this.pool.connect();
   }
+
+  async dropConstraints(table: Table): Promise<void> {}
+
+  async dropIndexes(table: Table): Promise<void> {}
 
   async end(): Promise<void> {
     await this.pool.end();
@@ -32,6 +36,8 @@ export class PGDB extends DB {
 
     if(err) throw err;
   }
+
+  async syncField(table: Table, field: Field<native, unknown>): Promise<void> {}
 
   async syncTable(table: Table): Promise<void> {
     if(table.autoIncrement) {

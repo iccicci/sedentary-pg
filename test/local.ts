@@ -39,5 +39,6 @@ export const expected = {
   sync_create_table_parent_add:    ["DROP TABLE test3s CASCADE", "CREATE TABLE test3s () INHERITS (test1s)"],
   sync_create_table_parent_change: ["DROP TABLE test3s CASCADE", "CREATE TABLE test3s () INHERITS (test2s)"],
   sync_create_table_parent_remove: ["CREATE SEQUENCE test3s_id_seq", "DROP TABLE test3s CASCADE", "CREATE TABLE test3s ()"],
+  sync_create_table_parent_same:   [""],
   sync_create_table_pk:            ["CREATE TABLE test2s ()"]
 };
