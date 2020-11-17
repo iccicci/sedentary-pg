@@ -17,10 +17,35 @@ export class PGDB extends DB {
 
   async dropConstraints(table: Table): Promise<void> {}
 
+  async dropFields(table: Table): Promise<void> {
+    const res = await this.client.query("SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND attisdropped = false AND attinhcount = 0", [table.oid]);
+
+    for(const i in res.rows) {
+      if(table.fields.filter(f => f.fieldName === res.rows[i].attname).length === 0) {
+        const statement = `ALTER TABLE ${table.tableName} DROP COLUMN ${res.rows[i].attname}`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      }
+    }
+  }
+
   async dropIndexes(table: Table): Promise<void> {}
 
   async end(): Promise<void> {
     await this.pool.end();
+  }
+
+  fieldType(field: Field<native, unknown>): string {
+    const { size, type } = field;
+
+    if(type === "INT") {
+      if(size === 2) return "SMALLINT";
+      if(size === 4) return "INTEGER";
+      return "BIGINT";
+    }
+
+    throw new Error(`Unknown type: '${type}', '${size}'`);
   }
 
   async sync(): Promise<void> {
@@ -37,7 +62,21 @@ export class PGDB extends DB {
     if(err) throw err;
   }
 
-  async syncField(table: Table, field: Field<native, unknown>): Promise<void> {}
+  async syncField(table: Table, field: Field<native, unknown>): Promise<void> {
+    const res = await this.client.query(
+      "SELECT * FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2",
+      [table.oid, field.fieldName]
+    );
+
+    if(! res.rowCount) {
+      const statement = `ALTER TABLE ${table.tableName} ADD COLUMN ${field.fieldName} ${this.fieldType(field)}`;
+
+      this.log(statement);
+      await this.client.query(statement);
+
+      return;
+    }
+  }
 
   async syncTable(table: Table): Promise<void> {
     if(table.autoIncrement) {
