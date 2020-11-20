@@ -15,7 +15,40 @@ export class PGDB extends DB {
     this.client = await this.pool.connect();
   }
 
-  async dropConstraints(table: Table): Promise<void> {}
+  async dropConstraints(table: Table): Promise<void> {
+    let place = 1;
+    const query = "SELECT conname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1]";
+    const values: (number | string)[] = [table.oid];
+    const wheres = [];
+
+    for(const i in table.constraints) {
+      wheres.push(` AND (contype <> $${++place} or attname <> $${++place})`);
+      values.push(table.constraints[i].type);
+      values.push(table.constraints[i].field);
+    }
+
+    const res = await this.client.query(query + wheres.join(""), values);
+
+    if(! res.rowCount) return;
+    /*
+      return pgo.client.query("SELECT conindid FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1]", [table.oid], function(err, res) {
+        const arr = [];
+
+        if(pgo.error(err, 1011, table.name)) return;
+
+        for(const i in res.rows) arr.push(res.rows[i].conindid);
+
+        dropIndex(pgo, arr);
+      });
+    */
+
+    for(const i in res.rows) {
+      const statement = `ALTER TABLE ${table.tableName} DROP CONSTRAINT ${res.rows[i].conname}`;
+
+      this.log(statement);
+      await this.client.query(statement);
+    }
+  }
 
   async dropFields(table: Table): Promise<void> {
     const res = await this.client.query("SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND attisdropped = false AND attinhcount = 0", [table.oid]);
@@ -62,19 +95,38 @@ export class PGDB extends DB {
     if(err) throw err;
   }
 
-  async syncField(table: Table, field: Field<native, unknown>): Promise<void> {
-    const res = await this.client.query(
-      "SELECT * FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2",
-      [table.oid, field.fieldName]
-    );
+  async syncConstraints(table: Table): Promise<void> {
+    for(const i in table.constraints) {
+      const constraint = table.constraints[i];
 
-    if(! res.rowCount) {
-      const statement = `ALTER TABLE ${table.tableName} ADD COLUMN ${field.fieldName} ${this.fieldType(field)}`;
+      const res = await this.client.query("SELECT attname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1] AND attname = $2", [
+        table.oid,
+        constraint.field
+      ]);
 
-      this.log(statement);
-      await this.client.query(statement);
+      if(! res.rowCount) {
+        const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraint.name} ${constraint.type === "u" ? `UNIQUE(${constraint.field})` : ``}`;
 
-      return;
+        this.log(statement);
+        await this.client.query(statement);
+      }
+    }
+  }
+
+  async syncFields(table: Table): Promise<void> {
+    for(const i in table.fields) {
+      const field = table.fields[i];
+      const res = await this.client.query(
+        "SELECT * FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2",
+        [table.oid, field.fieldName]
+      );
+
+      if(! res.rowCount) {
+        const statement = `ALTER TABLE ${table.tableName} ADD COLUMN ${field.fieldName} ${this.fieldType(field)}`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      }
     }
   }
 
