@@ -1,15 +1,18 @@
 after_script:
-  - 'if [[ `node --version` =~ ^v14 && $PG_VERSION == 13 ]] ; then npm run coverage ; npm install codeclimate-test-reporter ; codeclimate-test-reporter < coverage/lcov.info ; fi'
+  - 'if [[ `node --version` =~ ^v14 && $PG_VERSION == 13 ]] ; then ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT ; fi'
 before_install:
   - 'sudo service postgresql stop'
   - 'sudo service postgresql restart $PG_VERSION'
 before_script:
+  - 'curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter'
+  - 'chmod +x ./cc-test-reporter'
+  - './cc-test-reporter before-build'
   - 'psql -c "CREATE DATABASE sedentary;" -U postgres'
   - 'psql -c "ALTER DATABASE sedentary SET timezone TO ''GMT'';" -U postgres'
   - 'export SPG=''{"user":"postgres","password":"postgres"}'''
 env:
   global:
-    - CODECLIMATE_REPO_TOKEN=c7519657dfea145349c1b7a98f7134f033c25f598b40ad5b077744eb4beb7c66
+    - CC_TEST_REPORTER_ID=c7519657dfea145349c1b7a98f7134f033c25f598b40ad5b077744eb4beb7c66
   matrix:
     - PG_VERSION=13
     - PG_VERSION=12
@@ -17,7 +20,8 @@ env:
     - PG_VERSION=10
 language: node_js
 node_js:
-  - '14'
-  - '12'
-  - '10'
+  - '"14"'
+  - '"12"'
+  - '"10"'
+script: 'npm run coverage'
 sudo: required

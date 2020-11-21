@@ -33,7 +33,13 @@ export async function clean(): Promise<void> {
 }
 
 export const expected = {
-  sync_create_table:               ["CREATE SEQUENCE test1s_id_seq", "CREATE TABLE test1s ()", "ALTER TABLE test1s ADD COLUMN id BIGINT", "ALTER TABLE test1s ADD CONSTRAINT test1s_id_unique UNIQUE(id)"],
+  sync_create_table: [
+    "CREATE SEQUENCE test1s_id_seq",
+    "CREATE TABLE test1s ()",
+    "ALTER TABLE test1s ADD COLUMN id BIGINT",
+    "ALTER SEQUENCE test1s_id_seq OWNED BY test1s.id",
+    "ALTER TABLE test1s ADD CONSTRAINT test1s_id_unique UNIQUE(id)"
+  ],
   sync_create_table_exists:        [""],
   sync_create_table_parent:        ["CREATE TABLE test3s () INHERITS (test1s)"],
   sync_create_table_parent_add:    ["DROP TABLE test3s CASCADE", "CREATE TABLE test3s () INHERITS (test1s)"],
@@ -43,6 +49,7 @@ export const expected = {
     "DROP TABLE test3s CASCADE",
     "CREATE TABLE test3s ()",
     "ALTER TABLE test3s ADD COLUMN id BIGINT",
+    "ALTER SEQUENCE test3s_id_seq OWNED BY test3s.id",
     "ALTER TABLE test3s ADD CONSTRAINT test3s_id_unique UNIQUE(id)"
   ],
   sync_create_table_parent_same: [""],

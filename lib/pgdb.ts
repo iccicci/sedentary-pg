@@ -126,8 +126,17 @@ export class PGDB extends DB {
 
         this.log(statement);
         await this.client.query(statement);
-      }
+      } else console.log(res.rows[0].typname);
     }
+  }
+
+  async syncSequence(table: Table): Promise<void> {
+    if(! table.autoIncrementOwn) return;
+
+    const statement = `ALTER SEQUENCE ${table.tableName}_id_seq OWNED BY ${table.tableName}.id`;
+
+    this.log(statement);
+    await this.client.query(statement);
   }
 
   async syncTable(table: Table): Promise<void> {
@@ -142,6 +151,7 @@ export class PGDB extends DB {
 
             this.log(statement);
             await this.client.query(statement);
+            table.autoIncrementOwn = true;
 
             return;
           }
