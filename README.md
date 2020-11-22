@@ -15,17 +15,17 @@
 [code-badge]: https://codeclimate.com/github/iccicci/sedentary-pg/badges/gpa.svg
 [code-url]: https://codeclimate.com/github/iccicci/sedentary-pg
 [cover-badge]: https://codeclimate.com/github/iccicci/sedentary-pg/badges/coverage.svg
-[deps-badge]: https://badgen.net/npm/dependents/sedentary-pg?icon=npm
-[donate-badge]: https://badgen.net/badge/donate/bitcoin?icon=bitcoin
+[deps-badge]: https://badgen.net/npm/dependents/sedentary-pg?icon=npm&cache=300
+[donate-badge]: https://badgen.net/badge/donate/bitcoin?icon=bitcoin&cache=300
 [donate-url]: https://blockchain.info/address/1Md9WFAHrXTb3yPBwQWmUfv2RmzrtbHioB
 [github-url]: https://github.com/iccicci/sedentary-pg
-[npm-downloads-badge]: https://badgen.net/npm/dw/sedentary-pg?icon=npm
-[npm-badge]: https://badgen.net/npm/v/sedentary-pg?color=green&icon=npm
+[npm-downloads-badge]: https://badgen.net/npm/dw/sedentary-pg?icon=npm&cache=300
+[npm-badge]: https://badgen.net/npm/v/sedentary-pg?color=green&icon=npm&cache=300
 [npm-url]: https://www.npmjs.com/package/sedentary-pg
-[stars-badge]: https://badgen.net/github/stars/iccicci/sedentary-pg?icon=github
-[travis-badge]: https://travis-ci.com/iccicci/sedentary-pg.svg?branch=master
+[stars-badge]: https://badgen.net/github/stars/iccicci/sedentary-pg?icon=github&cache=300
+[travis-badge]: https://badgen.net/travis/iccicci/sedentary-pg?icon=travis&cache=300
 [travis-url]: https://travis-ci.com/iccicci/sedentary-pg
-[types-badge]: https://badgen.net/npm/types/sedentary-pg?color=green&icon=typescript
+[types-badge]: https://badgen.net/npm/types/sedentary-pg?color=green&icon=typescript&cache=300
 
 # under development
 
