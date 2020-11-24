@@ -4,7 +4,7 @@
   "dependencies": {
     "@types/pg": "7.14.7",
     "pg": "8.5.1",
-    "sedentary": "0.0.7"
+    "sedentary": "0.0.8"
   },
   "description": "The ORM which never needs to migrate - PostgreSQL",
   "devDependencies": {
@@ -57,5 +57,5 @@
     "version": "node -r ts-node/register utils.ts version"
   },
   "types": "index.d.ts",
-  "version": "0.0.7"
+  "version": "0.0.8"
 }
