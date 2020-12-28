@@ -72,9 +72,10 @@ export class PGDB extends DB {
   fieldType(field: Field<native, unknown>): string {
     const { size, type } = field;
 
-    if(type === "INT") {
-      if(size === 2) return "SMALLINT";
-      if(size === 4) return "INTEGER";
+    switch(type) {
+    case "INT":
+      return size === 2 ? "SMALLINT" : "INTEGER";
+    case "INT8":
       return "BIGINT";
     }
 
