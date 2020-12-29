@@ -1,9 +1,13 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
-import { DB, Field, Table, native } from "sedentary/lib/db";
+import format from "pg-format";
+import { DB, Field, Table } from "sedentary/lib/db";
+
+const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT" };
 
 export class PGDB extends DB {
   private client: PoolClient;
   private pool: Pool;
+  private version: number;
 
   constructor(connection: PoolConfig, log: (message: string) => void) {
     super(log);
@@ -13,6 +17,10 @@ export class PGDB extends DB {
 
   async connect(): Promise<void> {
     this.client = await this.pool.connect();
+
+    const res = await this.client.query("SELECT version()");
+
+    this.version = parseInt(res.rows[0].version.split(" ")[1].split(".")[0], 10);
   }
 
   async dropConstraints(table: Table): Promise<void> {
@@ -69,7 +77,7 @@ export class PGDB extends DB {
     await this.pool.end();
   }
 
-  fieldType(field: Field<native, unknown>): string {
+  fieldType(field: Field<unknown, unknown>): string {
     const { size, type } = field;
 
     switch(type) {
@@ -118,16 +126,44 @@ export class PGDB extends DB {
     for(const i in table.fields) {
       const field = table.fields[i];
       const res = await this.client.query(
-        "SELECT * FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2",
+        `SELECT *${
+          this.version >= 12 ? ", pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS adsrc" : ""
+        } FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2`,
         [table.oid, field.fieldName]
       );
+      const defaultValue = field.defaultValue === undefined ? undefined : format("%L", field.defaultValue);
+      const setDefault = async () => {
+        const statement = `ALTER TABLE ${table.tableName} ALTER COLUMN ${field.fieldName} SET DEFAULT ${defaultValue}`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      };
 
       if(! res.rowCount) {
         const statement = `ALTER TABLE ${table.tableName} ADD COLUMN ${field.fieldName} ${this.fieldType(field)}`;
 
         this.log(statement);
         await this.client.query(statement);
-      } else console.log(res.rows[0].typname);
+
+        if(field.defaultValue !== undefined) await setDefault();
+      } else {
+        if(types[res.rows[0].typname] !== this.fieldType(field)) {
+          console.log(res.rows[0].typname, types[res.rows[0].typname], this.fieldType(field));
+          const statement = `ALTER TABLE ${table.tableName} ALTER COLUMN ${field.fieldName} TYPE ${this.fieldType(field)}`;
+
+          this.log(statement);
+          await this.client.query(statement);
+        }
+
+        if(field.defaultValue === undefined) {
+          if(res.rows[0].adsrc) {
+            const statement = `ALTER TABLE ${table.tableName} ALTER COLUMN ${field.fieldName} DROP DEFAULT`;
+
+            this.log(statement);
+            await this.client.query(statement);
+          }
+        } else if(! res.rows[0].adsrc || res.rows[0].adsrc.split("::")[0] !== defaultValue) await setDefault();
+      }
     }
   }
 

@@ -18,7 +18,19 @@ function pgdb(): [SedentaryPG, { [key: string]: unknown }] {
 describe("errors", () => {
   let err: Error;
 
-  describe("sync", () => {
+  describe("SedentaryPG.constructor(connection)", () => {
+    before(async () => {
+      try {
+        new SedentaryPG("" as never);
+      } catch(e) {
+        err = e;
+      }
+    });
+
+    it("message", () => eq(err.message, "SedentaryPG.constructor: 'connection' argument: Wrong type, expected 'Object'"));
+  });
+
+  describe("PGDB.sync", () => {
     before(async () => {
       const [db, ddb] = pgdb();
 
@@ -38,7 +50,7 @@ describe("errors", () => {
     it("error", () => eq(err.message, "test"));
   });
 
-  describe("syncTable", () => {
+  describe("PGDB.syncTable", () => {
     before(async () => {
       const [db, ddb] = pgdb();
 

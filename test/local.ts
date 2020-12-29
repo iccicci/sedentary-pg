@@ -76,13 +76,23 @@ export const expected = {
     "ALTER TABLE test1s ADD COLUMN id INTEGER",
     "ALTER TABLE test1s ADD COLUMN a INTEGER",
     "ALTER TABLE test1s ADD COLUMN b INTEGER",
-    "ALTER TABLE test1s ADD COLUMN c INTEGER",
+    "ALTER TABLE test1s ADD COLUMN c SMALLINT",
+    "ALTER TABLE test1s ALTER COLUMN c SET DEFAULT '23'",
     "ALTER TABLE test1s ADD COLUMN d BIGINT",
+    "ALTER TABLE test1s ALTER COLUMN d SET DEFAULT '23'",
     "ALTER TABLE test1s ADD COLUMN f INTEGER",
     "ALTER TABLE test1s ADD COLUMN h INTEGER",
     "ALTER SEQUENCE test1s_id_seq OWNED BY test1s.id",
     "ALTER TABLE test1s ADD CONSTRAINT test1s_id_unique UNIQUE(id)",
     "ALTER TABLE test1s ADD CONSTRAINT test1s_a_unique UNIQUE(a)"
   ],
-  sync_field_options_change: ["ALTER TABLE test1s DROP CONSTRAINT test1s_a_unique", "ALTER TABLE test1s DROP COLUMN h", "ALTER TABLE test1s ADD CONSTRAINT test1s_b_unique UNIQUE(b)"]
+  sync_field_options_change: [
+    "ALTER TABLE test1s DROP CONSTRAINT test1s_a_unique",
+    "ALTER TABLE test1s DROP COLUMN h",
+    "ALTER TABLE test1s ALTER COLUMN a SET DEFAULT '23'",
+    "ALTER TABLE test1s ALTER COLUMN c DROP DEFAULT",
+    "ALTER TABLE test1s ALTER COLUMN d SET DEFAULT '42'",
+    "ALTER TABLE test1s ALTER COLUMN f TYPE BIGINT",
+    "ALTER TABLE test1s ADD CONSTRAINT test1s_b_unique UNIQUE(b)"
+  ]
 };
