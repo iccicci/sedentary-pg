@@ -2,7 +2,19 @@ import { Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
 import { DB, Field, Table } from "sedentary/lib/db";
 
-const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT" };
+const needDrop = [
+  ["DATETIME", "int2"],
+  ["DATETIME", "int4"],
+  ["DATETIME", "int8"],
+  ["INT", "timestamptz"],
+  ["INT8", "timestamptz"]
+];
+const needUsing = [
+  ["DATETIME", "varchar"],
+  ["INT", "varchar"],
+  ["INT8", "varchar"]
+];
+const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", varchar: "VARCHAR" };
 
 export class PGDB extends DB {
   private client: PoolClient;
@@ -58,17 +70,17 @@ export class PGDB extends DB {
     }
   }
 
+  async dropField(tableName: string, fieldName: string): Promise<void> {
+    const statement = `ALTER TABLE ${tableName} DROP COLUMN ${fieldName}`;
+
+    this.log(statement);
+    await this.client.query(statement);
+  }
+
   async dropFields(table: Table): Promise<void> {
     const res = await this.client.query("SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND attisdropped = false AND attinhcount = 0", [table.oid]);
 
-    for(const i in res.rows) {
-      if(table.fields.filter(f => f.fieldName === res.rows[i].attname).length === 0) {
-        const statement = `ALTER TABLE ${table.tableName} DROP COLUMN ${res.rows[i].attname}`;
-
-        this.log(statement);
-        await this.client.query(statement);
-      }
-    }
+    for(const i in res.rows) if(table.fields.filter(f => f.fieldName === res.rows[i].attname).length === 0) await this.dropField(table.tableName, res.rows[i].attname);
   }
 
   async dropIndexes(table: Table): Promise<void> {}
@@ -77,14 +89,21 @@ export class PGDB extends DB {
     await this.pool.end();
   }
 
-  fieldType(field: Field<unknown, unknown>): string {
+  fieldType(field: Field<unknown, unknown>): string[] {
     const { size, type } = field;
+    let ret;
 
     switch(type) {
+    case "DATETIME":
+      return ["DATETIME", "TIMESTAMP (3) WITH TIME ZONE"];
     case "INT":
-      return size === 2 ? "SMALLINT" : "INTEGER";
+      ret = size === 2 ? "SMALLINT" : "INTEGER";
+
+      return [ret, ret];
     case "INT8":
-      return "BIGINT";
+      return ["BIGINT", "BIGINT"];
+    case "VARCHAR":
+      return ["VARCHAR", "VARCHAR" + (size ? `(${size})` : "")];
     }
 
     throw new Error(`Unknown type: '${type}', '${size}'`);
@@ -123,46 +142,68 @@ export class PGDB extends DB {
   }
 
   async syncFields(table: Table): Promise<void> {
-    for(const i in table.fields) {
-      const field = table.fields[i];
+    const { fields, oid, tableName } = table;
+
+    for(const i in fields) {
+      const field = fields[i];
+      const { fieldName, size } = field;
+      const defaultValue = field.defaultValue === undefined ? undefined : format("%L", field.defaultValue);
+      const [base, type] = this.fieldType(field);
+
       const res = await this.client.query(
         `SELECT *${
           this.version >= 12 ? ", pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS adsrc" : ""
         } FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2`,
-        [table.oid, field.fieldName]
+        [oid, fieldName]
       );
-      const defaultValue = field.defaultValue === undefined ? undefined : format("%L", field.defaultValue);
+
+      const addField = async () => {
+        const statement = `ALTER TABLE ${tableName} ADD COLUMN ${fieldName} ${type}`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      };
+
+      const dropDefault = async () => {
+        const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} DROP DEFAULT`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      };
+
       const setDefault = async () => {
-        const statement = `ALTER TABLE ${table.tableName} ALTER COLUMN ${field.fieldName} SET DEFAULT ${defaultValue}`;
+        if(defaultValue === undefined) return;
+
+        const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} SET DEFAULT ${defaultValue}`;
 
         this.log(statement);
         await this.client.query(statement);
       };
 
       if(! res.rowCount) {
-        const statement = `ALTER TABLE ${table.tableName} ADD COLUMN ${field.fieldName} ${this.fieldType(field)}`;
-
-        this.log(statement);
-        await this.client.query(statement);
-
-        if(field.defaultValue !== undefined) await setDefault();
+        await addField();
+        await setDefault();
       } else {
-        if(types[res.rows[0].typname] !== this.fieldType(field)) {
-          console.log(res.rows[0].typname, types[res.rows[0].typname], this.fieldType(field));
-          const statement = `ALTER TABLE ${table.tableName} ALTER COLUMN ${field.fieldName} TYPE ${this.fieldType(field)}`;
+        const { adsrc, typname, atttypmod } = res.rows[0];
 
-          this.log(statement);
-          await this.client.query(statement);
-        }
+        if(types[typname] !== base || (base === "VARCHAR" && (size ? size + 4 !== atttypmod : atttypmod !== -1))) {
+          if(needDrop.filter(([type, name]) => field.type === type && typname === name).length) {
+            await this.dropField(tableName, fieldName);
+            await addField();
+            await setDefault();
+          } else {
+            if(adsrc) dropDefault();
 
-        if(field.defaultValue === undefined) {
-          if(res.rows[0].adsrc) {
-            const statement = `ALTER TABLE ${table.tableName} ALTER COLUMN ${field.fieldName} DROP DEFAULT`;
+            const using = needUsing.filter(([type, name]) => field.type === type && typname === name).length ? " USING " + fieldName + "::" + type : "";
+            const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} TYPE ${type}${using}`;
 
             this.log(statement);
             await this.client.query(statement);
+            await setDefault();
           }
-        } else if(! res.rows[0].adsrc || res.rows[0].adsrc.split("::")[0] !== defaultValue) await setDefault();
+        } else if(defaultValue === undefined) {
+          if(adsrc) dropDefault();
+        } else if(! adsrc || adsrc.split("::")[0] !== defaultValue) await setDefault();
       }
     }
   }
