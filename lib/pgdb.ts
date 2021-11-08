@@ -16,6 +16,13 @@ const needUsing = [
 ];
 const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", varchar: "VARCHAR" };
 
+function arrayCompare(a1: string[], a2: string[]): boolean {
+  if(a1.length !== a2.length) return false;
+  for(const e of a1) if(a2.indexOf(e) === -1) return false;
+
+  return true;
+}
+
 export class PGDB extends DB {
   private client: PoolClient;
   private pool: Pool;
@@ -204,6 +211,26 @@ export class PGDB extends DB {
         } else if(defaultValue === undefined) {
           if(adsrc) dropDefault();
         } else if(! adsrc || adsrc.split("::")[0] !== defaultValue) await setDefault();
+      }
+    }
+  }
+
+  async syncIndexes(table: Table): Promise<void> {
+    const query =
+      "SELECT relname, attname FROM pg_class, pg_index, pg_attribute, pg_am WHERE indrelid = $1 AND indexrelid = pg_class.oid AND attrelid = pg_class.oid AND relam = pg_am.oid AND amname = $2 ORDER BY relname";
+
+    for(const index of table.indexes) {
+      const fields: string[] = [];
+      const res = await this.client.query(query, [table.oid, index.type]);
+
+      for(const row of res.rows) if(row.relname === table.tableName) fields.push(row.attname);
+
+      console.log(index, fields, res.rowCount, res.rows);
+      if(! arrayCompare(index.fields, fields)) {
+        const statement = `CREATE INDEX ON ${table.tableName} USING ${index.type} (${index.fields.join(", ")})`;
+
+        this.log(statement);
+        await this.client.query(statement);
       }
     }
   }

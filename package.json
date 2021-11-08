@@ -2,29 +2,29 @@
   "author": "Daniele Ricci <daniele.icc@gmail.com> (https://github.com/iccicci)",
   "bugs": "https://github.com/iccicci/sedentary-pg/issues",
   "dependencies": {
-    "@types/pg": "7.14.7",
-    "@types/pg-format": "1.0.1",
-    "pg": "8.5.1",
+    "@types/pg": "8.6.1",
+    "@types/pg-format": "1.0.2",
+    "pg": "8.7.1",
     "pg-format": "1.0.4",
     "sedentary": "0.0.11"
   },
   "description": "The ORM which never needs to migrate - PostgreSQL",
   "devDependencies": {
-    "@types/mocha": "8.2.0",
-    "@types/node": "14.14.16",
+    "@types/mocha": "9.0.0",
+    "@types/node": "16.11.6",
     "@types/yamljs": "0.2.31",
-    "@typescript-eslint/eslint-plugin": "4.11.1",
-    "@typescript-eslint/parser": "4.11.1",
-    "eslint": "7.16.0",
-    "mocha": "8.2.1",
+    "@typescript-eslint/eslint-plugin": "5.3.0",
+    "@typescript-eslint/parser": "5.3.0",
+    "eslint": "8.2.0",
+    "mocha": "9.1.3",
     "nyc": "15.1.0",
-    "prettier": "2.2.1",
-    "ts-node": "9.1.1",
-    "typescript": "4.1.3",
+    "prettier": "2.4.1",
+    "ts-node": "10.4.0",
+    "typescript": "4.4.4",
     "yamljs": "0.3.0"
   },
   "engines": {
-    "node": ">=10.0"
+    "node": ">=12.0"
   },
   "homepage": "https://github.com/iccicci/sedentary-pg#readme",
   "keywords": [
