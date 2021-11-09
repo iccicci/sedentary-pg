@@ -151,9 +151,8 @@ export class PGDB extends DB {
   async syncFields(table: Table): Promise<void> {
     const { fields, oid, tableName } = table;
 
-    for(const i in fields) {
-      const field = fields[i];
-      const { fieldName, size } = field;
+    for(const field of fields) {
+      const { fieldName, notNull, size } = field;
       const defaultValue = field.defaultValue === undefined ? undefined : format("%L", field.defaultValue);
       const [base, type] = this.fieldType(field);
 
@@ -187,17 +186,28 @@ export class PGDB extends DB {
         await this.client.query(statement);
       };
 
+      const setNotNull = async (isNull: boolean) => {
+        if(isNull === notNull) return;
+
+        const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} ${notNull ? "SET" : "DROP"} NOT NULL`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      };
+
       if(! res.rowCount) {
         await addField();
         await setDefault();
+        await setNotNull(false);
       } else {
-        const { adsrc, typname, atttypmod } = res.rows[0];
+        const { adsrc, attnotnull, atttypmod, typname } = res.rows[0];
 
         if(types[typname] !== base || (base === "VARCHAR" && (size ? size + 4 !== atttypmod : atttypmod !== -1))) {
           if(needDrop.filter(([type, name]) => field.type === type && typname === name).length) {
             await this.dropField(tableName, fieldName);
             await addField();
             await setDefault();
+            await setNotNull(false);
           } else {
             if(adsrc) dropDefault();
 
@@ -207,10 +217,15 @@ export class PGDB extends DB {
             this.log(statement);
             await this.client.query(statement);
             await setDefault();
+            await setNotNull(attnotnull);
           }
         } else if(defaultValue === undefined) {
           if(adsrc) dropDefault();
-        } else if(! adsrc || adsrc.split("::")[0] !== defaultValue) await setDefault();
+          await setNotNull(attnotnull);
+        } else if(! adsrc || adsrc.split("::")[0] !== defaultValue) {
+          await setDefault();
+          await setNotNull(attnotnull);
+        }
       }
     }
   }
