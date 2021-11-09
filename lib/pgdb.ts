@@ -1,6 +1,6 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { DB, Field, Table } from "sedentary/lib/db";
+import { DB, Field, IndexDef, Table } from "sedentary/lib/db";
 
 const needDrop = [
   ["DATETIME", "int2"],
@@ -16,15 +16,9 @@ const needUsing = [
 ];
 const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", varchar: "VARCHAR" };
 
-function arrayCompare(a1: string[], a2: string[]): boolean {
-  if(a1.length !== a2.length) return false;
-  for(const e of a1) if(a2.indexOf(e) === -1) return false;
-
-  return true;
-}
-
 export class PGDB extends DB {
   private client: PoolClient;
+  private indexes: string[];
   private pool: Pool;
   private version: number;
 
@@ -90,7 +84,38 @@ export class PGDB extends DB {
     for(const i in res.rows) if(table.fields.filter(f => f.fieldName === res.rows[i].attname).length === 0) await this.dropField(table.tableName, res.rows[i].attname);
   }
 
-  async dropIndexes(table: Table): Promise<void> {}
+  async dropIndexes(table: Table): Promise<void> {
+    const { indexes, oid } = table;
+    const iobject: { [key: string]: IndexDef } = {};
+    const res = await this.client.query(
+      "SELECT amname, attname, indisunique, relname FROM pg_class, pg_index, pg_attribute, pg_am WHERE indrelid = $1 AND indexrelid = pg_class.oid AND attrelid = pg_class.oid AND relam = pg_am.oid ORDER BY attnum",
+      [oid]
+    );
+
+    for(const row of res.rows) {
+      const { amname, attname, indisunique, relname } = row;
+
+      if(iobject[relname]) iobject[relname].fields.push(attname);
+      else iobject[relname] = { fields: [attname], name: relname, type: amname, unique: indisunique };
+    }
+
+    this.indexes = [];
+    for(const index of indexes) {
+      const { name } = index;
+
+      if(iobject[name] && this.indexesEq(index, iobject[name])) {
+        this.indexes.push(name);
+        delete iobject[name];
+      }
+    }
+
+    for(const index of Object.keys(iobject).sort()) {
+      const statement = `DROP INDEX ${index}`;
+
+      this.log(statement);
+      await this.client.query(statement);
+    }
+  }
 
   async end(): Promise<void> {
     await this.pool.end();
@@ -231,18 +256,13 @@ export class PGDB extends DB {
   }
 
   async syncIndexes(table: Table): Promise<void> {
-    const query =
-      "SELECT relname, attname FROM pg_class, pg_index, pg_attribute, pg_am WHERE indrelid = $1 AND indexrelid = pg_class.oid AND attrelid = pg_class.oid AND relam = pg_am.oid AND amname = $2 ORDER BY relname";
+    const { indexes, tableName } = table;
 
-    for(const index of table.indexes) {
-      const fields: string[] = [];
-      const res = await this.client.query(query, [table.oid, index.type]);
+    for(const index of indexes) {
+      const { fields, name, type, unique } = index;
 
-      for(const row of res.rows) if(row.relname === table.tableName) fields.push(row.attname);
-
-      console.log(index, fields, res.rowCount, res.rows);
-      if(! arrayCompare(index.fields, fields)) {
-        const statement = `CREATE INDEX ON ${table.tableName} USING ${index.type} (${index.fields.join(", ")})`;
+      if(this.indexes.indexOf(name) === -1) {
+        const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${name} ON ${tableName} USING ${type} (${fields.join(", ")})`;
 
         this.log(statement);
         await this.client.query(statement);
