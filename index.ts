@@ -1,7 +1,11 @@
-import { SchemaOptions, Sedentary } from "sedentary";
+import { SchemaOptions as SedentarySchemaOptions, Sedentary } from "sedentary";
 import { PoolConfig } from "pg";
 
 import { PGDB } from "./lib/pgdb";
+
+export interface SchemaOptions extends SedentarySchemaOptions {
+  serverless?: boolean;
+}
 
 export class SedentaryPG extends Sedentary {
   constructor(connection: PoolConfig, options?: SchemaOptions) {
