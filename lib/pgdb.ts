@@ -182,8 +182,8 @@ export class PGDB extends DB {
       const [base, type] = this.fieldType(field);
 
       const res = await this.client.query(
-        `SELECT *${
-          this.version >= 12 ? ", pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS adsrc" : ""
+        `SELECT attnotnull, atttypmod, typname, ${
+          this.version >= 12 ? "pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS adsrc" : "adsrc"
         } FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2`,
         [oid, fieldName]
       );
@@ -202,15 +202,6 @@ export class PGDB extends DB {
         await this.client.query(statement);
       };
 
-      const setDefault = async () => {
-        if(defaultValue === undefined) return;
-
-        const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} SET DEFAULT ${defaultValue}`;
-
-        this.log(statement);
-        await this.client.query(statement);
-      };
-
       const setNotNull = async (isNull: boolean) => {
         if(isNull === notNull) return;
 
@@ -220,10 +211,27 @@ export class PGDB extends DB {
         await this.client.query(statement);
       };
 
+      const setDefault = async (isNull: boolean) => {
+        if(defaultValue !== undefined) {
+          let statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} SET DEFAULT ${defaultValue}`;
+
+          this.log(statement);
+          await this.client.query(statement);
+
+          if(isNull) {
+            statement = `UPDATE ${tableName} SET ${fieldName} = ${defaultValue} WHERE ${fieldName} IS NULL`;
+
+            this.log(statement);
+            this.client.query(statement);
+          }
+        }
+
+        await setNotNull(isNull);
+      };
+
       if(! res.rowCount) {
         await addField();
-        await setDefault();
-        await setNotNull(false);
+        await setDefault(false);
       } else {
         const { adsrc, attnotnull, atttypmod, typname } = res.rows[0];
 
@@ -231,8 +239,7 @@ export class PGDB extends DB {
           if(needDrop.filter(([type, name]) => field.type === type && typname === name).length) {
             await this.dropField(tableName, fieldName);
             await addField();
-            await setDefault();
-            await setNotNull(false);
+            await setDefault(false);
           } else {
             if(adsrc) dropDefault();
 
@@ -241,16 +248,12 @@ export class PGDB extends DB {
 
             this.log(statement);
             await this.client.query(statement);
-            await setDefault();
-            await setNotNull(attnotnull);
+            await setDefault(attnotnull);
           }
         } else if(defaultValue === undefined) {
           if(adsrc) dropDefault();
           await setNotNull(attnotnull);
-        } else if(! adsrc || adsrc.split("::")[0] !== defaultValue) {
-          await setDefault();
-          await setNotNull(attnotnull);
-        }
+        } else if(! adsrc || adsrc.split("::")[0] !== defaultValue) await setDefault(attnotnull);
       }
     }
   }
