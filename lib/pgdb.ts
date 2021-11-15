@@ -1,6 +1,6 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { DB, Entry, Field, IndexDef, Natural, Table } from "sedentary/lib/db";
+import { Attribute, DB, Entry, Index, Natural, Table } from "sedentary/lib/db";
 
 const needDrop = [
   ["DATETIME", "int2"],
@@ -45,7 +45,7 @@ export class PGDB extends DB {
     for(const i in table.constraints) {
       wheres.push(` AND (contype <> $${++place} or attname <> $${++place})`);
       values.push(table.constraints[i].type);
-      values.push(table.constraints[i].field);
+      values.push(table.constraints[i].attribute);
     }
 
     const res = await this.client.query(query + wheres.join(""), values);
@@ -81,12 +81,12 @@ export class PGDB extends DB {
   async dropFields(table: Table): Promise<void> {
     const res = await this.client.query("SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND attisdropped = false AND attinhcount = 0", [table.oid]);
 
-    for(const i in res.rows) if(table.fields.filter(f => f.fieldName === res.rows[i].attname).length === 0) await this.dropField(table.tableName, res.rows[i].attname);
+    for(const i in res.rows) if(table.attributes.filter(f => f.fieldName === res.rows[i].attname).length === 0) await this.dropField(table.tableName, res.rows[i].attname);
   }
 
   async dropIndexes(table: Table): Promise<void> {
     const { indexes, oid } = table;
-    const iobject: { [key: string]: IndexDef } = {};
+    const iobject: { [key: string]: Index } = {};
     const res = await this.client.query(
       "SELECT amname, attname, indisunique, relname FROM pg_class, pg_index, pg_attribute, pg_am WHERE indrelid = $1 AND indexrelid = pg_class.oid AND attrelid = pg_class.oid AND relam = pg_am.oid ORDER BY attnum",
       [oid]
@@ -95,17 +95,17 @@ export class PGDB extends DB {
     for(const row of res.rows) {
       const { amname, attname, indisunique, relname } = row;
 
-      if(iobject[relname]) iobject[relname].fields.push(attname);
-      else iobject[relname] = { fields: [attname], name: relname, type: amname, unique: indisunique };
+      if(iobject[relname]) iobject[relname].attributes.push(attname);
+      else iobject[relname] = { attributes: [attname], indexName: relname, type: amname, unique: indisunique };
     }
 
     this.indexes = [];
     for(const index of indexes) {
-      const { name } = index;
+      const { indexName } = index;
 
-      if(iobject[name] && this.indexesEq(index, iobject[name])) {
-        this.indexes.push(name);
-        delete iobject[name];
+      if(iobject[indexName] && this.indexesEq(index, iobject[indexName])) {
+        this.indexes.push(indexName);
+        delete iobject[indexName];
       }
     }
 
@@ -121,8 +121,8 @@ export class PGDB extends DB {
     await this.pool.end();
   }
 
-  fieldType(field: Field<Natural, Entry>): string[] {
-    const { size, type } = field;
+  fieldType(attribute: Attribute<Natural, Entry>): string[] {
+    const { size, type } = attribute;
     let ret;
 
     switch(type) {
@@ -161,11 +161,11 @@ export class PGDB extends DB {
 
       const res = await this.client.query("SELECT attname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1] AND attname = $2", [
         table.oid,
-        constraint.field
+        constraint.attribute
       ]);
 
       if(! res.rowCount) {
-        const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraint.name} ${constraint.type === "u" ? `UNIQUE(${constraint.field})` : ``}`;
+        const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraint.constraintName} ${constraint.type === "u" ? `UNIQUE(${constraint.attribute})` : ``}`;
 
         this.log(statement);
         await this.client.query(statement);
@@ -174,12 +174,12 @@ export class PGDB extends DB {
   }
 
   async syncFields(table: Table): Promise<void> {
-    const { fields, oid, tableName } = table;
+    const { attributes, oid, tableName } = table;
 
-    for(const field of fields) {
-      const { fieldName, notNull, size } = field;
-      const defaultValue = field.defaultValue === undefined ? undefined : format("%L", field.defaultValue);
-      const [base, type] = this.fieldType(field);
+    for(const attribute of attributes) {
+      const { fieldName, notNull, size } = attribute;
+      const defaultValue = attribute.defaultValue === undefined ? undefined : format("%L", attribute.defaultValue);
+      const [base, type] = this.fieldType(attribute);
 
       const res = await this.client.query(
         `SELECT attnotnull, atttypmod, typname, ${
@@ -236,14 +236,14 @@ export class PGDB extends DB {
         const { adsrc, attnotnull, atttypmod, typname } = res.rows[0];
 
         if(types[typname] !== base || (base === "VARCHAR" && (size ? size + 4 !== atttypmod : atttypmod !== -1))) {
-          if(needDrop.filter(([type, name]) => field.type === type && typname === name).length) {
+          if(needDrop.filter(([type, name]) => attribute.type === type && typname === name).length) {
             await this.dropField(tableName, fieldName);
             await addField();
             await setDefault(false);
           } else {
             if(adsrc) dropDefault();
 
-            const using = needUsing.filter(([type, name]) => field.type === type && typname === name).length ? " USING " + fieldName + "::" + type : "";
+            const using = needUsing.filter(([type, name]) => attribute.type === type && typname === name).length ? " USING " + fieldName + "::" + type : "";
             const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} TYPE ${type}${using}`;
 
             this.log(statement);
@@ -262,10 +262,10 @@ export class PGDB extends DB {
     const { indexes, tableName } = table;
 
     for(const index of indexes) {
-      const { fields, name, type, unique } = index;
+      const { attributes, indexName, type, unique } = index;
 
-      if(this.indexes.indexOf(name) === -1) {
-        const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${name} ON ${tableName} USING ${type} (${fields.join(", ")})`;
+      if(this.indexes.indexOf(indexName) === -1) {
+        const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${indexName} ON ${tableName} USING ${type} (${attributes.join(", ")})`;
 
         this.log(statement);
         await this.client.query(statement);
