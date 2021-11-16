@@ -1,6 +1,6 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { Attribute, DB, Entry, Index, Natural, Table } from "sedentary/lib/db";
+import { Attribute, DB, Index, Natural, Table } from "sedentary/lib/db";
 
 const needDrop = [
   ["DATETIME", "int2"],
@@ -121,7 +121,7 @@ export class PGDB extends DB {
     await this.pool.end();
   }
 
-  fieldType(attribute: Attribute<Natural, Entry>): string[] {
+  fieldType(attribute: Attribute<Natural, unknown>): string[] {
     const { size, type } = attribute;
     let ret;
 
