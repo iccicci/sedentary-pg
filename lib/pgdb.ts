@@ -95,8 +95,8 @@ export class PGDB extends DB {
     for(const row of res.rows) {
       const { amname, attname, indisunique, relname } = row;
 
-      if(iobject[relname]) iobject[relname].attributes.push(attname);
-      else iobject[relname] = { attributes: [attname], indexName: relname, type: amname, unique: indisunique };
+      if(iobject[relname]) iobject[relname].fields.push(attname);
+      else iobject[relname] = { fields: [attname], indexName: relname, type: amname, unique: indisunique };
     }
 
     this.indexes = [];
@@ -262,10 +262,10 @@ export class PGDB extends DB {
     const { indexes, tableName } = table;
 
     for(const index of indexes) {
-      const { attributes, indexName, type, unique } = index;
+      const { fields, indexName, type, unique } = index;
 
       if(this.indexes.indexOf(indexName) === -1) {
-        const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${indexName} ON ${tableName} USING ${type} (${attributes.join(", ")})`;
+        const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${indexName} ON ${tableName} USING ${type} (${fields.join(", ")})`;
 
         this.log(statement);
         await this.client.query(statement);
