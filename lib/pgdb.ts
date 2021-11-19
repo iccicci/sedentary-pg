@@ -45,30 +45,23 @@ export class PGDB extends DB {
     for(const i in table.constraints) {
       wheres.push(` AND (contype <> $${++place} or attname <> $${++place})`);
       values.push(table.constraints[i].type);
-      values.push(table.constraints[i].attribute);
+      values.push(table.constraints[i].attribute.fieldName);
     }
 
-    const res = await this.client.query(query + wheres.join(""), values);
+    //const res = await this.client.query(query + wheres.join(""), values);
+    //    const res = await this.client.query("SELECT * FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1]", [table.oid]);
+    const res = await this.client.query("SELECT * FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1", [table.oid]);
 
-    if(! res.rowCount) return;
+    console.log(res.rows);
+
     /*
-      return pgo.client.query("SELECT conindid FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1]", [table.oid], function(err, res) {
-        const arr = [];
-
-        if(pgo.error(err, 1011, table.name)) return;
-
-        for(const i in res.rows) arr.push(res.rows[i].conindid);
-
-        dropIndex(pgo, arr);
-      });
-    */
-
     for(const i in res.rows) {
       const statement = `ALTER TABLE ${table.tableName} DROP CONSTRAINT ${res.rows[i].conname}`;
 
       this.log(statement);
       await this.client.query(statement);
     }
+    */
   }
 
   async dropField(tableName: string, fieldName: string): Promise<void> {
@@ -157,19 +150,23 @@ export class PGDB extends DB {
 
   async syncConstraints(table: Table): Promise<void> {
     for(const i in table.constraints) {
-      const constraint = table.constraints[i];
+      const { attribute, constraintName, type } = table.constraints[i];
 
+      /*
       const res = await this.client.query("SELECT attname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1] AND attname = $2", [
         table.oid,
         constraint.attribute
       ]);
 
       if(! res.rowCount) {
-        const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraint.constraintName} ${constraint.type === "u" ? `UNIQUE(${constraint.attribute})` : ``}`;
+        */
+      const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraintName} ${
+        type === "f" ? `FOREIGN KEY (${attribute.fieldName}) REFERENCES ${attribute.foreignKey.tableName}(${attribute.foreignKey.fieldName})` : ``
+      }`;
 
-        this.log(statement);
-        await this.client.query(statement);
-      }
+      this.log(statement);
+      await this.client.query(statement);
+      //      }
     }
   }
 

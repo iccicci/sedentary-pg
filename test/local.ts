@@ -161,8 +161,29 @@ export const expected = {
     "ALTER TABLE test1 ALTER COLUMN f SET NOT NULL\n",
     "CREATE UNIQUE INDEX test1_b_unique ON test1 USING btree (b)\n"
   ],
-  sync_foreign_keys: [""],
-  sync_index_1:      [
+  sync_foreign_keys_1: [
+    "CREATE SEQUENCE test1_id_seq\n",
+    "CREATE TABLE test1 ()\n",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER\n",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL\n",
+    "ALTER TABLE test1 ADD COLUMN a INTEGER\n",
+    "ALTER TABLE test1 ADD COLUMN b BIGINT\n",
+    "ALTER TABLE test1 ADD COLUMN d VARCHAR\n",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
+    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n",
+    "CREATE SEQUENCE test2_id_seq\n",
+    "CREATE TABLE test2 ()\n",
+    "ALTER TABLE test2 ADD COLUMN id INTEGER\n",
+    "ALTER TABLE test2 ALTER COLUMN id SET NOT NULL\n",
+    "ALTER TABLE test2 ADD COLUMN a INTEGER\n",
+    "ALTER TABLE test2 ADD COLUMN b INTEGER\n",
+    "ALTER TABLE test2 ADD COLUMN c BIGINT\n",
+    "ALTER TABLE test2 ADD COLUMN d VARCHAR\n",
+    "ALTER SEQUENCE test2_id_seq OWNED BY test2.id\n",
+    "CREATE UNIQUE INDEX test2_id_unique ON test2 USING btree (id)\n"
+  ],
+  sync_foreign_keys_2: [""],
+  sync_index_1:        [
     "CREATE SEQUENCE test1_id_seq\n",
     "CREATE TABLE test1 ()\n",
     "ALTER TABLE test1 ADD COLUMN id INTEGER\n",
