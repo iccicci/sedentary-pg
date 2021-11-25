@@ -64,7 +64,7 @@ export class PGDB extends DB {
   async dropFields(table: Table): Promise<void> {
     const res = await this.client.query("SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND attisdropped = false AND attinhcount = 0", [table.oid]);
 
-    for(const i in res.rows) if(table.attributes.filter(f => f.fieldName === res.rows[i].attname).length === 0) await this.dropField(table.tableName, res.rows[i].attname);
+    for(const i in res.rows) if(! table.findField(res.rows[i].attname)) await this.dropField(table.tableName, res.rows[i].attname);
   }
 
   async dropIndexes(table: Table, constraintIndexes: number[]): Promise<void> {
@@ -310,7 +310,7 @@ export class PGDB extends DB {
 
       if(resParent.rowCount) {
         if(! table.parent) drop = true;
-        else if(this.tables[table.parent.tableName].oid === resParent.rows[0].inhparent) return;
+        else if(this.findTable(table.parent.tableName).oid === resParent.rows[0].inhparent) return;
 
         drop = true;
       } else if(table.parent) drop = true;

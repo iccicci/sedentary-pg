@@ -1,6 +1,7 @@
 import { strictEqual as eq } from "assert";
 
 import { SedentaryPG } from "..";
+import { errorHelper } from "./helper";
 import { connection } from "./local";
 
 class PGDB extends SedentaryPG {
@@ -12,7 +13,7 @@ class PGDB extends SedentaryPG {
 function pgdb(): [SedentaryPG, { [key: string]: unknown }] {
   const db = new PGDB(connection, { log: () => {} });
 
-  return [db, (db.getDB() as unknown) as { [key: string]: unknown }];
+  return [db, db.getDB() as unknown as { [key: string]: unknown }];
 }
 
 describe("errors", () => {
@@ -73,4 +74,10 @@ describe("errors", () => {
 
     it("error", () => eq(err.message, "test"));
   });
+
+  describe("Sedentary.FKEY() - not unique target", () =>
+    errorHelper(db => {
+      class test1 extends db.model("test1", { a: db.INT }) {}
+      db.model("test", { a: db.FKEY(test1.a) });
+    })("Sedentary.FKEY: 'test1' table: 'a' attribute: is not unique: can't be used as FKEY target"));
 });
