@@ -47,7 +47,7 @@ export const expected = {
     "ALTER TABLE test1 ALTER COLUMN f SET DEFAULT '1976-01-23 14:00:00.000+00'\n",
     "ALTER TABLE test1 ALTER COLUMN f SET NOT NULL\n",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
-    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n"
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n"
   ],
   types_datetime_changes: [
     "ALTER TABLE test1 DROP COLUMN f\n",
@@ -75,7 +75,7 @@ export const expected = {
     "ALTER TABLE test1 ALTER COLUMN f SET DEFAULT '23'\n",
     "ALTER TABLE test1 ALTER COLUMN f SET NOT NULL\n",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
-    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n"
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n"
   ],
   types_int_change: [
     "ALTER TABLE test1 ALTER COLUMN a TYPE INTEGER USING a::INTEGER\n",
@@ -91,7 +91,7 @@ export const expected = {
     "ALTER TABLE test1 ADD COLUMN id INTEGER\n",
     "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL\n",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
-    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n"
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n"
   ],
   sync_create_table_exists: [""],
   sync_create_table_int8id: [
@@ -102,7 +102,7 @@ export const expected = {
     "ALTER TABLE test1 ADD COLUMN a INTEGER\n",
     "ALTER TABLE test1 ADD COLUMN b BIGINT\n",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
-    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n"
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n"
   ],
   sync_create_table_parent:        ["CREATE TABLE test3 () INHERITS (test1)\n"],
   sync_create_table_parent_add:    ["DROP TABLE test3 CASCADE\n", "CREATE TABLE test3 () INHERITS (test1)\n"],
@@ -114,7 +114,7 @@ export const expected = {
     "ALTER TABLE test3 ADD COLUMN id INTEGER\n",
     "ALTER TABLE test3 ALTER COLUMN id SET NOT NULL\n",
     "ALTER SEQUENCE test3_id_seq OWNED BY test3.id\n",
-    "CREATE UNIQUE INDEX test3_id_unique ON test3 USING btree (id)\n"
+    "ALTER TABLE test3 ADD CONSTRAINT test3_id_unique UNIQUE(id)\n"
   ],
   sync_create_table_parent_same: [""],
   sync_create_table_pk:          [
@@ -122,10 +122,10 @@ export const expected = {
     "ALTER TABLE test2 ADD COLUMN a INTEGER\n",
     "ALTER TABLE test2 ALTER COLUMN a SET NOT NULL\n",
     "ALTER TABLE test2 ADD COLUMN b INTEGER\n",
-    "CREATE UNIQUE INDEX test2_a_unique ON test2 USING btree (a)\n",
-    "CREATE UNIQUE INDEX test2_b_unique ON test2 USING btree (b)\n"
+    "ALTER TABLE test2 ADD CONSTRAINT test2_a_unique UNIQUE(a)\n",
+    "ALTER TABLE test2 ADD CONSTRAINT test2_b_unique UNIQUE(b)\n"
   ],
-  sync_drop_column:   ["DROP INDEX test2_b_unique\n", "ALTER TABLE test2 DROP COLUMN b\n"],
+  sync_drop_column:   ["ALTER TABLE test2 DROP CONSTRAINT test2_b_unique CASCADE\n", "ALTER TABLE test2 DROP COLUMN b\n"],
   sync_field_options: [
     "CREATE SEQUENCE test1_id_seq\n",
     "CREATE TABLE test1 ()\n",
@@ -143,11 +143,11 @@ export const expected = {
     "ALTER TABLE test1 ADD COLUMN f INTEGER\n",
     "ALTER TABLE test1 ADD COLUMN h INTEGER\n",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
-    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n",
-    "CREATE UNIQUE INDEX test1_a_unique ON test1 USING btree (a)\n"
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_a_unique UNIQUE(a)\n"
   ],
   sync_field_options_change: [
-    "DROP INDEX test1_a_unique\n",
+    "ALTER TABLE test1 DROP CONSTRAINT test1_a_unique CASCADE\n",
     "ALTER TABLE test1 DROP COLUMN h\n",
     "ALTER TABLE test1 ALTER COLUMN a SET DEFAULT '23'\n",
     "ALTER TABLE test1 ALTER COLUMN a SET NOT NULL\n",
@@ -159,7 +159,7 @@ export const expected = {
     "UPDATE test1 SET d = '42' WHERE d IS NULL\n",
     "ALTER TABLE test1 ALTER COLUMN f TYPE BIGINT\n",
     "ALTER TABLE test1 ALTER COLUMN f SET NOT NULL\n",
-    "CREATE UNIQUE INDEX test1_b_unique ON test1 USING btree (b)\n"
+    "ALTER TABLE test1 ADD CONSTRAINT test1_b_unique UNIQUE(b)\n"
   ],
   sync_foreign_keys_1: [
     "CREATE SEQUENCE test1_id_seq\n",
@@ -170,7 +170,10 @@ export const expected = {
     "ALTER TABLE test1 ADD COLUMN b BIGINT\n",
     "ALTER TABLE test1 ADD COLUMN d VARCHAR\n",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
-    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_a_unique UNIQUE(a)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_b_unique UNIQUE(b)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_d_unique UNIQUE(d)\n",
     "CREATE SEQUENCE test2_id_seq\n",
     "CREATE TABLE test2 ()\n",
     "ALTER TABLE test2 ADD COLUMN id INTEGER\n",
@@ -180,10 +183,29 @@ export const expected = {
     "ALTER TABLE test2 ADD COLUMN c BIGINT\n",
     "ALTER TABLE test2 ADD COLUMN d VARCHAR\n",
     "ALTER SEQUENCE test2_id_seq OWNED BY test2.id\n",
-    "CREATE UNIQUE INDEX test2_id_unique ON test2 USING btree (id)\n"
+    "ALTER TABLE test2 ADD CONSTRAINT test2_id_unique UNIQUE(id)\n",
+    "ALTER TABLE test2 ADD CONSTRAINT fkey_a_test1_id FOREIGN KEY (a) REFERENCES test1(id)\n",
+    "ALTER TABLE test2 ADD CONSTRAINT fkey_b_test1_a FOREIGN KEY (b) REFERENCES test1(a)\n",
+    "ALTER TABLE test2 ADD CONSTRAINT fkey_c_test1_b FOREIGN KEY (c) REFERENCES test1(b)\n",
+    "ALTER TABLE test2 ADD CONSTRAINT fkey_d_test1_d FOREIGN KEY (d) REFERENCES test1(d)\n"
   ],
-  sync_foreign_keys_2: [""],
-  sync_index_1:        [
+  sync_foreign_keys_2: [
+    "ALTER TABLE test1 DROP CONSTRAINT test1_b_unique CASCADE\n",
+    "ALTER TABLE test1 DROP CONSTRAINT test1_d_unique CASCADE\n",
+    "CREATE SEQUENCE test3_id_seq\n",
+    "CREATE TABLE test3 ()\n",
+    "ALTER TABLE test3 ADD COLUMN id INTEGER\n",
+    "ALTER TABLE test3 ALTER COLUMN id SET NOT NULL\n",
+    "ALTER TABLE test3 ADD COLUMN b BIGINT\n",
+    "ALTER SEQUENCE test3_id_seq OWNED BY test3.id\n",
+    "ALTER TABLE test3 ADD CONSTRAINT test3_id_unique UNIQUE(id)\n",
+    "ALTER TABLE test3 ADD CONSTRAINT test3_b_unique UNIQUE(b)\n",
+    "ALTER TABLE test2 DROP CONSTRAINT fkey_a_test1_id CASCADE\n",
+    "ALTER TABLE test2 DROP COLUMN d\n",
+    "ALTER TABLE test2 ADD CONSTRAINT fkey_a_test1_a FOREIGN KEY (a) REFERENCES test1(a)\n",
+    "ALTER TABLE test2 ADD CONSTRAINT fkey_c_test3_b FOREIGN KEY (c) REFERENCES test3(b)\n"
+  ],
+  sync_index_1: [
     "CREATE SEQUENCE test1_id_seq\n",
     "CREATE TABLE test1 ()\n",
     "ALTER TABLE test1 ADD COLUMN id INTEGER\n",
@@ -191,7 +213,7 @@ export const expected = {
     "ALTER TABLE test1 ADD COLUMN a INTEGER\n",
     "ALTER TABLE test1 ADD COLUMN b BIGINT\n",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
-    "CREATE UNIQUE INDEX test1_id_unique ON test1 USING btree (id)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n",
     "CREATE INDEX ia ON test1 USING btree (a)\n"
   ],
   sync_index_2: ["CREATE INDEX ib ON test1 USING btree (a, b)\n"],

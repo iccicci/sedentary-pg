@@ -36,32 +36,22 @@ export class PGDB extends DB {
     this.version = parseInt(res.rows[0].version.split(" ")[1].split(".")[0], 10);
   }
 
-  async dropConstraints(table: Table): Promise<void> {
-    let place = 1;
-    const query = "SELECT conname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1]";
-    const values: (number | string)[] = [table.oid];
-    const wheres = [];
+  async dropConstraints(table: Table): Promise<number[]> {
+    const indexes: number[] = [];
+    const res = await this.client.query("SELECT * FROM pg_constraint WHERE conrelid = $1 ORDER BY conname", [table.oid]);
 
-    for(const i in table.constraints) {
-      wheres.push(` AND (contype <> $${++place} or attname <> $${++place})`);
-      values.push(table.constraints[i].type);
-      values.push(table.constraints[i].attribute.fieldName);
+    for(const row of res.rows) {
+      const constraint = table.constraints.filter(_ => _.constraintName === row.conname);
+
+      if(constraint.length === 0) {
+        const statement = `ALTER TABLE ${table.tableName} DROP CONSTRAINT ${row.conname} CASCADE`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      } else indexes.push(row.conindid);
     }
 
-    //const res = await this.client.query(query + wheres.join(""), values);
-    //    const res = await this.client.query("SELECT * FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1]", [table.oid]);
-    const res = await this.client.query("SELECT * FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1", [table.oid]);
-
-    console.log(res.rows);
-
-    /*
-    for(const i in res.rows) {
-      const statement = `ALTER TABLE ${table.tableName} DROP CONSTRAINT ${res.rows[i].conname}`;
-
-      this.log(statement);
-      await this.client.query(statement);
-    }
-    */
+    return indexes;
   }
 
   async dropField(tableName: string, fieldName: string): Promise<void> {
@@ -77,19 +67,21 @@ export class PGDB extends DB {
     for(const i in res.rows) if(table.attributes.filter(f => f.fieldName === res.rows[i].attname).length === 0) await this.dropField(table.tableName, res.rows[i].attname);
   }
 
-  async dropIndexes(table: Table): Promise<void> {
+  async dropIndexes(table: Table, constraintIndexes: number[]): Promise<void> {
     const { indexes, oid } = table;
     const iobject: { [key: string]: Index } = {};
     const res = await this.client.query(
-      "SELECT amname, attname, indisunique, relname FROM pg_class, pg_index, pg_attribute, pg_am WHERE indrelid = $1 AND indexrelid = pg_class.oid AND attrelid = pg_class.oid AND relam = pg_am.oid ORDER BY attnum",
+      "SELECT amname, attname, indexrelid, indisunique, relname FROM pg_class, pg_index, pg_attribute, pg_am WHERE indrelid = $1 AND indexrelid = pg_class.oid AND attrelid = pg_class.oid AND relam = pg_am.oid ORDER BY attnum",
       [oid]
     );
 
     for(const row of res.rows) {
-      const { amname, attname, indisunique, relname } = row;
+      const { amname, attname, indexrelid, indisunique, relname } = row;
 
-      if(iobject[relname]) iobject[relname].fields.push(attname);
-      else iobject[relname] = { fields: [attname], indexName: relname, type: amname, unique: indisunique };
+      if(! constraintIndexes.includes(indexrelid)) {
+        if(iobject[relname]) iobject[relname].fields.push(attname);
+        else iobject[relname] = { fields: [attname], indexName: relname, type: amname, unique: indisunique };
+      }
     }
 
     this.indexes = [];
@@ -149,24 +141,30 @@ export class PGDB extends DB {
   }
 
   async syncConstraints(table: Table): Promise<void> {
-    for(const i in table.constraints) {
-      const { attribute, constraintName, type } = table.constraints[i];
-
-      /*
+    for(const constraint of table.constraints) {
+      const { attribute, constraintName, type } = constraint;
       const res = await this.client.query("SELECT attname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1] AND attname = $2", [
         table.oid,
-        constraint.attribute
+        attribute.fieldName
       ]);
 
       if(! res.rowCount) {
-        */
-      const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraintName} ${
-        type === "f" ? `FOREIGN KEY (${attribute.fieldName}) REFERENCES ${attribute.foreignKey.tableName}(${attribute.foreignKey.fieldName})` : ``
-      }`;
+        let query: string;
 
-      this.log(statement);
-      await this.client.query(statement);
-      //      }
+        switch(type) {
+        case "f":
+          query = `FOREIGN KEY (${attribute.fieldName}) REFERENCES ${attribute.foreignKey.tableName}(${attribute.foreignKey.fieldName})`;
+          break;
+        case "u":
+          query = `UNIQUE(${attribute.fieldName})`;
+          break;
+        }
+
+        const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraintName} ${query}`;
+
+        this.log(statement);
+        await this.client.query(statement);
+      }
     }
   }
 
@@ -261,7 +259,7 @@ export class PGDB extends DB {
     for(const index of indexes) {
       const { fields, indexName, type, unique } = index;
 
-      if(this.indexes.indexOf(indexName) === -1) {
+      if(! this.indexes.includes(indexName)) {
         const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${indexName} ON ${tableName} USING ${type} (${fields.join(", ")})`;
 
         this.log(statement);
