@@ -1,6 +1,6 @@
 import { strictEqual as eq } from "assert";
 
-import { SedentaryPG } from "..";
+import { SedentaryPG, Type } from "..";
 import { errorHelper } from "./helper";
 import { connection } from "./local";
 
@@ -75,7 +75,24 @@ describe("errors", () => {
     it("error", () => eq(err.message, "test"));
   });
 
-  describe("Sedentary.FKEY() - not unique target", () =>
+  describe("PGDB.syncField", () => {
+    before(async () => {
+      const [db] = pgdb();
+
+      try {
+        db.model("test1", { a: new Type({ base: Number, size: 3, type: "test" }) });
+        await db.connect();
+      } catch(e) {
+        err = e;
+      }
+
+      await db.end();
+    });
+
+    it("error", () => eq(err.message, "Unknown type: 'test', '3'"));
+  });
+
+  describe("SedentaryPG.FKEY", () =>
     errorHelper(db => {
       class test1 extends db.model("test1", { a: db.INT }) {}
       db.model("test", { a: db.FKEY(test1.a) });

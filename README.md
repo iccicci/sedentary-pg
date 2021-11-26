@@ -29,4 +29,6 @@
 
 # under development
 
+https://www.postgresql.org/support/versioning/
+
 https://bucardo.org/postgres_all_versions.html

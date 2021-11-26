@@ -1,12 +1,13 @@
-import { Entry, Natural, SchemaOptions, Sedentary, Type } from "sedentary";
+import { Entry, Natural, SedentaryOptions, Sedentary, Type } from "sedentary";
 import { PoolConfig } from "pg";
 
 import { PGDB } from "./lib/pgdb";
 
-export { SchemaOptions } from "sedentary";
+export { AttributeDefinition, AttributeOptions, AttributesDefinition, Entry, IndexAttributes, IndexDefinition, IndexOptions } from "sedentary";
+export { ModelOptions, Natural, SedentaryOptions, Type, TypeDefinition } from "sedentary";
 
 export class SedentaryPG extends Sedentary {
-  constructor(connection: PoolConfig, options?: SchemaOptions) {
+  constructor(connection: PoolConfig, options?: SedentaryOptions) {
     super("", options);
 
     if(! (connection instanceof Object)) throw new Error("SedentaryPG.constructor: 'connection' argument: Wrong type, expected 'Object'");
