@@ -126,11 +126,11 @@ export class PGDB extends DB {
     throw new Error(`Unknown type: '${type}', '${size}'`);
   }
 
-  async sync(): Promise<void> {
+  async syncDataBase(): Promise<void> {
     let err: Error;
 
     try {
-      await super.sync();
+      await super.syncDataBase();
     } catch(e) {
       err = e;
     }
@@ -175,11 +175,10 @@ export class PGDB extends DB {
       const { fieldName, notNull, size } = attribute;
       const defaultValue = attribute.defaultValue === undefined ? undefined : format("%L", attribute.defaultValue);
       const [base, type] = this.fieldType(attribute);
+      const adsrc = this.version >= 12 ? "pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS adsrc" : "adsrc";
 
       const res = await this.client.query(
-        `SELECT attnotnull, atttypmod, typname, ${
-          this.version >= 12 ? "pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS adsrc" : "adsrc"
-        } FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2`,
+        `SELECT attnotnull, atttypmod, typname, ${adsrc} FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2`,
         [oid, fieldName]
       );
 

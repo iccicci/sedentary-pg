@@ -3,7 +3,7 @@ import { PoolConfig } from "pg";
 
 import { PGDB } from "./lib/pgdb";
 
-export { AttributeDefinition, AttributeOptions, AttributesDefinition, Entry, IndexAttributes, IndexDefinition, IndexOptions } from "sedentary";
+export { AttributeDefinition, AttributeOptions, AttributesDefinition, Entry, IndexAttributes, IndexDefinition, IndexOptions, IndexesDefinition } from "sedentary";
 export { ModelOptions, Natural, SedentaryOptions, Type, TypeDefinition } from "sedentary";
 
 export class SedentaryPG extends Sedentary {
