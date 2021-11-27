@@ -6,7 +6,7 @@
     "@types/pg-format": "1.0.2",
     "pg": "8.7.1",
     "pg-format": "1.0.4",
-    "sedentary": "0.0.14"
+    "sedentary": "0.0.15"
   },
   "description": "The ORM which never needs to migrate - PostgreSQL",
   "devDependencies": {
@@ -62,5 +62,5 @@
     "version": "node -r ts-node/register utils.ts version"
   },
   "types": "index.d.ts",
-  "version": "0.0.14"
+  "version": "0.0.15"
 }
