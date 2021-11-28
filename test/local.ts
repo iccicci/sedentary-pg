@@ -32,6 +32,65 @@ export async function clean(): Promise<void> {
   await pool.end();
 }
 
+export const dryrun = {
+  dryrun: [
+    "NOT SYNCING: ALTER TABLE test1 DROP CONSTRAINT test1_c_unique CASCADE\n",
+    "NOT SYNCING: DROP INDEX a\n",
+    "NOT SYNCING: DROP INDEX test1_c_unique\n",
+    "NOT SYNCING: ALTER TABLE test1 DROP COLUMN c\n",
+    "NOT SYNCING: ALTER TABLE test1 ALTER COLUMN a TYPE BIGINT\n",
+    "NOT SYNCING: ALTER TABLE test1 ALTER COLUMN a SET DEFAULT '23'\n",
+    "NOT SYNCING: ALTER TABLE test1 ALTER COLUMN a SET NOT NULL\n",
+    "NOT SYNCING: ALTER TABLE test1 ADD CONSTRAINT test1_a_unique UNIQUE(a)\n",
+    "NOT SYNCING: CREATE INDEX b ON test1 USING btree (b)\n",
+    "NOT SYNCING: CREATE SEQUENCE test2_id_seq\n",
+    "NOT SYNCING: DROP TABLE test2 CASCADE\n",
+    "NOT SYNCING: CREATE TABLE test2 ()\n",
+    "NOT SYNCING: ALTER TABLE test2 DROP CONSTRAINT fkey_d_test1_b CASCADE\n",
+    "NOT SYNCING: ALTER TABLE test2 DROP COLUMN d\n",
+    "NOT SYNCING: ALTER TABLE test2 ADD COLUMN id INTEGER\n",
+    "NOT SYNCING: ALTER TABLE test2 ALTER COLUMN id SET NOT NULL\n",
+    "NOT SYNCING: ALTER TABLE test2 ADD COLUMN g INTEGER\n",
+    "NOT SYNCING: ALTER TABLE test2 ALTER COLUMN e DROP DEFAULT\n",
+    "NOT SYNCING: ALTER TABLE test2 ALTER COLUMN e DROP NOT NULL\n",
+    "NOT SYNCING: ALTER TABLE test2 ALTER COLUMN f SET DEFAULT '42'\n",
+    "NOT SYNCING: UPDATE test2 SET f = '42' WHERE f IS NULL\n",
+    "NOT SYNCING: ALTER SEQUENCE test2_id_seq OWNED BY test2.id\n",
+    "NOT SYNCING: ALTER TABLE test2 ADD CONSTRAINT test2_id_unique UNIQUE(id)\n",
+    "NOT SYNCING: ALTER TABLE test2 ADD CONSTRAINT fkey_g_test1_b FOREIGN KEY (g) REFERENCES test1(b)\n",
+    "NOT SYNCING: CREATE SEQUENCE test3_id_seq\n",
+    "NOT SYNCING: CREATE TABLE test3 ()\n",
+    "NOT SYNCING: ALTER TABLE test3 ADD COLUMN id INTEGER\n",
+    "NOT SYNCING: ALTER TABLE test3 ALTER COLUMN id SET NOT NULL\n",
+    "NOT SYNCING: ALTER SEQUENCE test3_id_seq OWNED BY test3.id\n",
+    "NOT SYNCING: ALTER TABLE test3 ADD CONSTRAINT test3_id_unique UNIQUE(id)\n",
+    "NOT SYNCING: CREATE TABLE test4 () INHERITS (test1)\n"
+  ],
+  sync: [
+    "CREATE SEQUENCE test1_id_seq\n",
+    "CREATE TABLE test1 ()\n",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER\n",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL\n",
+    "ALTER TABLE test1 ADD COLUMN a INTEGER\n",
+    "ALTER TABLE test1 ADD COLUMN b INTEGER\n",
+    "ALTER TABLE test1 ADD COLUMN c INTEGER\n",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_b_unique UNIQUE(b)\n",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_c_unique UNIQUE(c)\n",
+    "CREATE INDEX a ON test1 USING btree (c)\n",
+    "CREATE TABLE test2 () INHERITS (test1)\n",
+    "ALTER TABLE test2 ADD COLUMN d INTEGER\n",
+    "ALTER TABLE test2 ADD COLUMN e INTEGER\n",
+    "ALTER TABLE test2 ALTER COLUMN e SET DEFAULT '23'\n",
+    "ALTER TABLE test2 ALTER COLUMN e SET NOT NULL\n",
+    "ALTER TABLE test2 ADD COLUMN f INTEGER\n",
+    "ALTER TABLE test2 ALTER COLUMN f SET DEFAULT '23'\n",
+    "ALTER TABLE test2 ALTER COLUMN f SET NOT NULL\n",
+    "ALTER TABLE test2 ADD CONSTRAINT fkey_d_test1_b FOREIGN KEY (d) REFERENCES test1(b)\n"
+  ]
+};
+
 export const expected = {
   types_datetime: [
     "CREATE SEQUENCE test1_id_seq\n",

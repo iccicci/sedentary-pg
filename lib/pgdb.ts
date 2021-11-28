@@ -1,6 +1,7 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
 import { Attribute, DB, Index, Natural, Table } from "sedentary/lib/db";
+import { adsrc } from "./adsrc";
 
 const needDrop = [
   ["DATETIME", "int2"],
@@ -46,8 +47,8 @@ export class PGDB extends DB {
       if(constraint.length === 0) {
         const statement = `ALTER TABLE ${table.tableName} DROP CONSTRAINT ${row.conname} CASCADE`;
 
-        this.log(statement);
-        await this.client.query(statement);
+        this.syncLog(statement);
+        if(this.sync) await this.client.query(statement);
       } else indexes.push(row.conindid);
     }
 
@@ -57,8 +58,8 @@ export class PGDB extends DB {
   async dropField(tableName: string, fieldName: string): Promise<void> {
     const statement = `ALTER TABLE ${tableName} DROP COLUMN ${fieldName}`;
 
-    this.log(statement);
-    await this.client.query(statement);
+    this.syncLog(statement);
+    if(this.sync) await this.client.query(statement);
   }
 
   async dropFields(table: Table): Promise<void> {
@@ -97,8 +98,8 @@ export class PGDB extends DB {
     for(const index of Object.keys(iobject).sort()) {
       const statement = `DROP INDEX ${index}`;
 
-      this.log(statement);
-      await this.client.query(statement);
+      this.syncLog(statement);
+      if(this.sync) await this.client.query(statement);
     }
   }
 
@@ -162,8 +163,8 @@ export class PGDB extends DB {
 
         const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraintName} ${query}`;
 
-        this.log(statement);
-        await this.client.query(statement);
+        this.syncLog(statement);
+        if(this.sync) await this.client.query(statement);
       }
     }
   }
@@ -175,25 +176,25 @@ export class PGDB extends DB {
       const { fieldName, notNull, size } = attribute;
       const defaultValue = attribute.defaultValue === undefined ? undefined : format("%L", attribute.defaultValue);
       const [base, type] = this.fieldType(attribute);
-      const adsrc = this.version >= 12 ? "pg_get_expr(pg_attrdef.adbin, pg_attrdef.adrelid) AS adsrc" : "adsrc";
+      const where = "attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2";
 
       const res = await this.client.query(
-        `SELECT attnotnull, atttypmod, typname, ${adsrc} FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2`,
+        `SELECT attnotnull, atttypmod, typname, ${adsrc(this.version)} FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE ${where}`,
         [oid, fieldName]
       );
 
       const addField = async () => {
         const statement = `ALTER TABLE ${tableName} ADD COLUMN ${fieldName} ${type}`;
 
-        this.log(statement);
-        await this.client.query(statement);
+        this.syncLog(statement);
+        if(this.sync) await this.client.query(statement);
       };
 
       const dropDefault = async () => {
         const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} DROP DEFAULT`;
 
-        this.log(statement);
-        await this.client.query(statement);
+        this.syncLog(statement);
+        if(this.sync) await this.client.query(statement);
       };
 
       const setNotNull = async (isNull: boolean) => {
@@ -201,22 +202,22 @@ export class PGDB extends DB {
 
         const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} ${notNull ? "SET" : "DROP"} NOT NULL`;
 
-        this.log(statement);
-        await this.client.query(statement);
+        this.syncLog(statement);
+        if(this.sync) await this.client.query(statement);
       };
 
       const setDefault = async (isNull: boolean) => {
         if(defaultValue !== undefined) {
           let statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} SET DEFAULT ${defaultValue}`;
 
-          this.log(statement);
-          await this.client.query(statement);
+          this.syncLog(statement);
+          if(this.sync) await this.client.query(statement);
 
           if(isNull) {
             statement = `UPDATE ${tableName} SET ${fieldName} = ${defaultValue} WHERE ${fieldName} IS NULL`;
 
-            this.log(statement);
-            this.client.query(statement);
+            this.syncLog(statement);
+            if(this.sync) this.client.query(statement);
           }
         }
 
@@ -240,8 +241,8 @@ export class PGDB extends DB {
             const using = needUsing.filter(([type, name]) => attribute.type === type && typname === name).length ? " USING " + fieldName + "::" + type : "";
             const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} TYPE ${type}${using}`;
 
-            this.log(statement);
-            await this.client.query(statement);
+            this.syncLog(statement);
+            if(this.sync) await this.client.query(statement);
             await setDefault(attnotnull);
           }
         } else if(defaultValue === undefined) {
@@ -261,8 +262,8 @@ export class PGDB extends DB {
       if(! this.indexes.includes(indexName)) {
         const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${indexName} ON ${tableName} USING ${type} (${fields.join(", ")})`;
 
-        this.log(statement);
-        await this.client.query(statement);
+        this.syncLog(statement);
+        if(this.sync) await this.client.query(statement);
       }
     }
   }
@@ -272,8 +273,8 @@ export class PGDB extends DB {
 
     const statement = `ALTER SEQUENCE ${table.tableName}_id_seq OWNED BY ${table.tableName}.id`;
 
-    this.log(statement);
-    await this.client.query(statement);
+    this.syncLog(statement);
+    if(this.sync) await this.client.query(statement);
   }
 
   async syncTable(table: Table): Promise<void> {
@@ -286,8 +287,8 @@ export class PGDB extends DB {
           if(e.code === "42P01") {
             const statement = `CREATE SEQUENCE ${table.tableName}_id_seq`;
 
-            this.log(statement);
-            await this.client.query(statement);
+            this.syncLog(statement);
+            if(this.sync) await this.client.query(statement);
             table.autoIncrementOwn = true;
 
             return;
@@ -318,8 +319,8 @@ export class PGDB extends DB {
         const statement = `DROP TABLE ${table.tableName} CASCADE`;
 
         create = true;
-        this.log(statement);
-        await this.client.query(statement);
+        this.syncLog(statement);
+        if(this.sync) await this.client.query(statement);
       }
     } else create = true;
 
@@ -327,12 +328,12 @@ export class PGDB extends DB {
       const parent = table.parent ? ` INHERITS (${table.parent.tableName})` : "";
       const statement = `CREATE TABLE ${table.tableName} ()${parent}`;
 
-      this.log(statement);
-      await this.client.query(statement);
+      this.syncLog(statement);
+      if(this.sync) await this.client.query(statement);
 
       const resTable = await this.client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
 
-      table.oid = resTable.rows[0].oid;
+      table.oid = resTable.rows[0]?.oid;
     }
   }
 }
