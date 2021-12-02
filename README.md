@@ -29,6 +29,49 @@
 
 # under development
 
-https://www.postgresql.org/support/versioning/
+# Description
 
-https://bucardo.org/postgres_all_versions.html
+The **PostgreSQL** specilized package of [Sedentary](https://www.npmjs.com/package/sedentary).
+
+# Installation
+
+With [npm](https://www.npmjs.com/package/sedentary-pg):
+
+```sh
+$ npm install --save sedentary-pg
+```
+
+# Documentation
+
+The full documentation is on [sedentary.readthedocs.io](https://sedentary.readthedocs.io/).
+
+# Compatibility
+
+Requires:
+
+- Node.js: **v12**
+- TypeScript: **v4.1** (or none if used in a JavaScript project).
+
+The package is tested under [all version combinations](https://app.travis-ci.com/github/iccicci/sedentary-pg)
+of **Node.js** currently supported accordingly to [Node.js Release](https://github.com/nodejs/Release#readme) and of
+**PostgreSQL** currently supported accordingly to
+[PostgreSQL Versioning](https://www.postgresql.org/support/versioning/).
+
+To work with the package under Windows, be sure to configure `bash.exe` as your _script-shell_.
+
+```
+> npm config set script-shell bash.exe
+```
+
+# Licence
+
+[MIT Licence](https://github.com/iccicci/sedentary-pg/blob/master/LICENSE)
+
+# Bugs
+
+Do not hesitate to report any bug or inconsistency [@github](https://github.com/iccicci/sedentary-pg/issues).
+
+# Donating
+
+If you find useful this package, please consider the opportunity to donate some satoshis to this bitcoin address:
+**1Md9WFAHrXTb3yPBwQWmUfv2RmzrtbHioB**

@@ -16,9 +16,9 @@ export class SedentaryPG extends Sedentary {
   }
 
   FKEY<N extends Natural, E extends Entry>(attribute: Type<N, E>): Type<N, E> {
-    const { attributeName, tableName, unique } = attribute as never;
+    const { attributeName, modelName, unique } = attribute as never;
 
-    if(! unique) throw new Error(`Sedentary.FKEY: '${tableName}' table: '${attributeName}' attribute: is not unique: can't be used as FKEY target`);
+    if(! unique) throw new Error(`Sedentary.FKEY: '${modelName}' model: '${attributeName}' attribute: is not unique: can't be used as FKEY target`);
 
     return super.FKEY(attribute);
   }

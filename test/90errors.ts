@@ -96,5 +96,5 @@ describe("errors", () => {
     errorHelper(db => {
       class test1 extends db.model("test1", { a: db.INT }) {}
       db.model("test", { a: db.FKEY(test1.a) });
-    })("Sedentary.FKEY: 'test1' table: 'a' attribute: is not unique: can't be used as FKEY target"));
+    })("Sedentary.FKEY: 'test1' model: 'a' attribute: is not unique: can't be used as FKEY target"));
 });
