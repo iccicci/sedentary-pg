@@ -1,6 +1,6 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { Attribute, DB, Index, Natural, Table } from "sedentary/lib/db";
+import { Attribute, DB, Index, Natural, ForeignKeyActions, Table } from "sedentary/lib/db";
 import { adsrc } from "./adsrc";
 
 const needDrop = [
@@ -16,6 +16,8 @@ const needUsing = [
   ["INT8", "varchar"]
 ];
 const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", varchar: "VARCHAR" };
+
+const actions: { [k in ForeignKeyActions]: string } = { cascade: "c", "no action": "a", restrict: "r", "set default": "d", "set null": "n" };
 
 export class PGDB extends DB {
   private client: PoolClient;
@@ -39,17 +41,26 @@ export class PGDB extends DB {
 
   async dropConstraints(table: Table): Promise<number[]> {
     const indexes: number[] = [];
-    const res = await this.client.query("SELECT * FROM pg_constraint WHERE conrelid = $1 ORDER BY conname", [table.oid]);
+    const res = await this.client.query("SELECT confdeltype, confupdtype, conindid, conname, contype FROM pg_constraint WHERE conrelid = $1 ORDER BY conname", [table.oid]);
 
     for(const row of res.rows) {
-      const constraint = table.constraints.filter(_ => _.constraintName === row.conname);
+      const arr = table.constraints.filter(_ => _.constraintName === row.conname && _.type === row.contype);
+      let drop = false;
 
-      if(constraint.length === 0) {
+      if(arr.length === 0) drop = true;
+      else if(row.contype === "u") indexes.push(row.conindid);
+      else {
+        const { options } = arr[0].attribute.foreignKey;
+
+        if(actions[options.onDelete] !== row.confdeltype || actions[options.onUpdate] !== row.confupdtype) drop = true;
+      }
+
+      if(drop) {
         const statement = `ALTER TABLE ${table.tableName} DROP CONSTRAINT ${row.conname} CASCADE`;
 
         this.syncLog(statement);
         if(this.sync) await this.client.query(statement);
-      } else indexes.push(row.conindid);
+      }
     }
 
     return indexes;
@@ -152,14 +163,13 @@ export class PGDB extends DB {
       if(! res.rowCount) {
         let query: string;
 
-        switch(type) {
-        case "f":
-          query = `FOREIGN KEY (${attribute.fieldName}) REFERENCES ${attribute.foreignKey.tableName}(${attribute.foreignKey.fieldName})`;
-          break;
-        case "u":
-          query = `UNIQUE(${attribute.fieldName})`;
-          break;
-        }
+        if(type === "f") {
+          const { fieldName, options, tableName } = attribute.foreignKey;
+          const onDelete = options.onDelete !== "no action" ? ` ON DELETE ${options.onDelete.toUpperCase()}` : "";
+          const onUpdate = options.onUpdate !== "no action" ? ` ON UPDATE ${options.onUpdate.toUpperCase()}` : "";
+
+          query = `FOREIGN KEY (${attribute.fieldName}) REFERENCES ${tableName}(${fieldName})${onDelete}${onUpdate}`;
+        } else query = `UNIQUE(${attribute.fieldName})`;
 
         const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraintName} ${query}`;
 
