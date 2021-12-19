@@ -1,7 +1,7 @@
 import { strictEqual as eq } from "assert";
 
-import { BaseEntry } from "..";
+import { EntryBase } from "..";
 
 describe("coverage", () => {
-  it("BaseEntry", () => eq(new BaseEntry() instanceof BaseEntry, true));
+  it("EntryBase", () => eq(new EntryBase() instanceof EntryBase, true));
 });
