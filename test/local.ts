@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { DatabaseError, Pool } from "pg";
 
 if(! process.env.SPG) throw "Missing SPG!";
 
@@ -17,7 +17,7 @@ export async function clean(): Promise<void> {
     try {
       await client.query(`DROP ${what} CASCADE`);
     } catch(e) {
-      if(e.code !== "42P01") throw e;
+      if(! (e instanceof DatabaseError) || e.code !== "42P01") throw e;
     }
   };
 

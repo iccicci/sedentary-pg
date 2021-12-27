@@ -1,6 +1,6 @@
-import { Pool, PoolClient, PoolConfig } from "pg";
+import { DatabaseError, Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { Attribute, DB, Index, Natural, ForeignKeyActions, Table } from "sedentary/lib/db";
+import { Attribute, DB, ForeignKeyActions, Index, Natural, Table } from "sedentary/lib/db";
 import { adsrc } from "./adsrc";
 
 const needDrop = [
@@ -28,7 +28,10 @@ export class PGDB extends DB {
   constructor(connection: PoolConfig, log: (message: string) => void) {
     super(log);
 
+    this.client = {} as PoolClient;
+    this.indexes = [];
     this.pool = new Pool(connection);
+    this.version = 0;
   }
 
   async connect(): Promise<void> {
@@ -50,7 +53,7 @@ export class PGDB extends DB {
       if(arr.length === 0) drop = true;
       else if(row.contype === "u") indexes.push(row.conindid);
       else {
-        const { options } = arr[0].attribute.foreignKey;
+        const { options } = arr[0].attribute.foreignKey as { attributeName: string; fieldName: string; options: { onDelete: ForeignKeyActions; onUpdate: ForeignKeyActions }; tableName: string };
 
         if(actions[options.onDelete] !== row.confdeltype || actions[options.onUpdate] !== row.confupdtype) drop = true;
       }
@@ -139,7 +142,7 @@ export class PGDB extends DB {
   }
 
   async syncDataBase(): Promise<void> {
-    let err: Error;
+    let err: unknown;
 
     try {
       await super.syncDataBase();
@@ -164,7 +167,12 @@ export class PGDB extends DB {
         let query: string;
 
         if(type === "f") {
-          const { fieldName, options, tableName } = attribute.foreignKey;
+          const { fieldName, options, tableName } = attribute.foreignKey as {
+            attributeName: string;
+            fieldName: string;
+            options: { onDelete: ForeignKeyActions; onUpdate: ForeignKeyActions };
+            tableName: string;
+          };
           const onDelete = options.onDelete !== "no action" ? ` ON DELETE ${options.onDelete.toUpperCase()}` : "";
           const onUpdate = options.onUpdate !== "no action" ? ` ON UPDATE ${options.onUpdate.toUpperCase()}` : "";
 
@@ -240,7 +248,7 @@ export class PGDB extends DB {
       } else {
         const { adsrc, attnotnull, atttypmod, typname } = res.rows[0];
 
-        if(types[typname] !== base || (base === "VARCHAR" && (size ? size + 4 !== atttypmod : atttypmod !== -1))) {
+        if(types[typname as keyof typeof types] !== base || (base === "VARCHAR" && (size ? size + 4 !== atttypmod : atttypmod !== -1))) {
           if(needDrop.filter(([type, name]) => attribute.type === type && typname === name).length) {
             await this.dropField(tableName, fieldName);
             await addField();
@@ -293,8 +301,8 @@ export class PGDB extends DB {
         try {
           await this.client.query(`SELECT currval('${table.tableName}_id_seq')`);
         } catch(e) {
-          if(e.code === "55000") return;
-          if(e.code === "42P01") {
+          if(e instanceof DatabaseError && e.code === "55000") return;
+          if(e instanceof DatabaseError && e.code === "42P01") {
             const statement = `CREATE SEQUENCE ${table.tableName}_id_seq`;
 
             this.syncLog(statement);
@@ -309,13 +317,13 @@ export class PGDB extends DB {
       })();
     }
 
-    let create: boolean;
+    let create = false;
     const resTable = await this.client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
 
     if(resTable.rowCount) {
       table.oid = resTable.rows[0].oid;
 
-      let drop: boolean;
+      let drop = false;
       const resParent = await this.client.query("SELECT inhparent FROM pg_inherits WHERE inhrelid = $1", [table.oid]);
 
       if(resParent.rowCount) {
