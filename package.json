@@ -8,7 +8,7 @@
   "dependencies": {
     "pg": "8.7.1",
     "pg-format": "1.0.4",
-    "sedentary": "0.0.21"
+    "sedentary": "0.0.22"
   },
   "description": "The ORM which never needs to migrate - PostgreSQL",
   "devDependencies": {
@@ -84,5 +84,5 @@
     }
   },
   "types": "index.d.ts",
-  "version": "0.0.21"
+  "version": "0.0.22"
 }
