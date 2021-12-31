@@ -33,6 +33,34 @@
 
 The **PostgreSQL** specilized package of [Sedentary](https://www.npmjs.com/package/sedentary).
 
+# Usage
+
+```javascript
+import { SedentaryPG } from "sedentary-pg";
+
+const db = new SedentaryPG(/* PG connection */);
+
+class Items extends db.model("Item", {
+  num: db.INT,
+  str: db.VARCHAR(30)
+});
+
+(async function () {
+  await db.connect();
+
+  const item = Items.create();
+
+  item.num = 0;
+  item.str = "0";
+
+  await item.save();
+
+  const records = await Items.load({});
+
+  console.log(records); // [{ id: 1, num: 0, str: "0" }]
+})();
+```
+
 # Installation
 
 With [npm](https://www.npmjs.com/package/sedentary-pg):
