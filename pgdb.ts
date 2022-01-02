@@ -1,6 +1,6 @@
 import { DatabaseError, Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { Attribute, DB, ForeignKeyActions, Index, Natural, Table } from "sedentary/lib/db";
+import { Attribute, DB, ForeignKeyActions, Index, Natural, Table, Transaction } from "sedentary/db";
 import { adsrc } from "./adsrc";
 
 const needDrop = [
@@ -15,7 +15,7 @@ const needUsing = [
   ["INT", "varchar"],
   ["INT8", "varchar"]
 ];
-const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", varchar: "VARCHAR" };
+const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", timestamptz: "DATETIME", varchar: "VARCHAR" };
 
 const actions: { [k in ForeignKeyActions]: string } = { cascade: "c", "no action": "a", restrict: "r", "set default": "d", "set null": "n" };
 
@@ -40,6 +40,78 @@ export class PGDB extends DB {
     const res = await this.client.query("SELECT version()");
 
     this.version = parseInt(res.rows[0].version.split(" ")[1].split(".")[0], 10);
+  }
+
+  async end(): Promise<void> {
+    this.client.release();
+    await this.pool.end();
+  }
+
+  defaultNeq(src: string, value: Natural): boolean {
+    if(src === value) return false;
+
+    return src.split("::")[0] !== value;
+  }
+
+  escape(value: Natural): string {
+    if(value === null || value === undefined) throw new Error("SedentaryPG: Can't escape null nor undefined values; use the 'IS NULL' operator instead");
+
+    const type = typeof value;
+
+    if(type === "number" || type === "boolean") return value.toString();
+    if(type === "string") return format("%L", value);
+    if(value instanceof Date) return format("%L", value).replace(/\.\d\d\d\+/, "+");
+
+    return format("%L", JSON.stringify(value));
+  }
+
+  fill(attributes: Attribute<Natural, unknown>[], row: Record<string, Natural>, entity: Record<string, Natural>) {
+    for(const attribute of attributes) entity[attribute.attributeName] = row[attribute.fieldName];
+  }
+
+  save(tableName: string, attributes: Attribute<Natural, unknown>[]): (this: Record<string, Natural> & { loaded?: Record<string, unknown>; tx?: TransactionPG }) => Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+
+    return async function() {
+      const client = this.tx ? this.tx.client : await self.pool.connect();
+
+      if(! this.loaded) {
+        const fields: string[] = [];
+        const values: string[] = [];
+
+        for(const attribute of attributes) {
+          const value = this[attribute.attributeName];
+
+          if(value !== null && value !== undefined) {
+            fields.push(attribute.fieldName);
+            values.push(self.escape(this[attribute.attributeName]));
+          }
+        }
+
+        const query = fields.length ? `INSERT INTO ${tableName} (${fields.join(",")}) VALUES (${values.join(",")})` : `INSERT INTO ${tableName} DEFAULT VALUES`;
+
+        try {
+          self.log(query);
+          self.fill(attributes, (await client.query(query + " RETURNING *")).rows[0], this);
+        } finally {
+          if(! this.tx) client.release();
+        }
+
+        return true;
+      }
+
+      let changed = false;
+      const { loaded } = this;
+
+      for(const key in this) {
+        if(typeof this[key] === "object") {
+          if(JSON.stringify(this[key]) !== JSON.stringify(loaded[key])) changed = true;
+        } else if(this[key] !== loaded[key]) changed = true;
+      }
+
+      return Promise.resolve(changed);
+    };
   }
 
   async dropConstraints(table: Table): Promise<number[]> {
@@ -117,44 +189,6 @@ export class PGDB extends DB {
     }
   }
 
-  async end(): Promise<void> {
-    await this.pool.end();
-  }
-
-  fieldType(attribute: Attribute<Natural, unknown>): string[] {
-    const { size, type } = attribute;
-    let ret;
-
-    switch(type) {
-    case "DATETIME":
-      return ["DATETIME", "TIMESTAMP (3) WITH TIME ZONE"];
-    case "INT":
-      ret = size === 2 ? "SMALLINT" : "INTEGER";
-
-      return [ret, ret];
-    case "INT8":
-      return ["BIGINT", "BIGINT"];
-    case "VARCHAR":
-      return ["VARCHAR", "VARCHAR" + (size ? `(${size})` : "")];
-    }
-
-    throw new Error(`Unknown type: '${type}', '${size}'`);
-  }
-
-  async syncDataBase(): Promise<void> {
-    let err: unknown;
-
-    try {
-      await super.syncDataBase();
-    } catch(e) {
-      err = e;
-    }
-
-    this.client.release();
-
-    if(err) throw err;
-  }
-
   async syncConstraints(table: Table): Promise<void> {
     for(const constraint of table.constraints) {
       const { attribute, constraintName, type } = constraint;
@@ -187,12 +221,32 @@ export class PGDB extends DB {
     }
   }
 
+  fieldType(attribute: Attribute<Natural, unknown>): string[] {
+    const { size, type } = attribute;
+    let ret;
+
+    switch(type) {
+    case "DATETIME":
+      return ["DATETIME", "TIMESTAMP (3) WITH TIME ZONE"];
+    case "INT":
+      ret = size === 2 ? "SMALLINT" : "INTEGER";
+
+      return [ret, ret];
+    case "INT8":
+      return ["BIGINT", "BIGINT"];
+    case "VARCHAR":
+      return ["VARCHAR", "VARCHAR" + (size ? `(${size})` : "")];
+    }
+
+    throw new Error(`Unknown type: '${type}', '${size}'`);
+  }
+
   async syncFields(table: Table): Promise<void> {
-    const { attributes, oid, tableName } = table;
+    const { attributes, autoIncrement, oid, tableName } = table;
 
     for(const attribute of attributes) {
       const { fieldName, notNull, size } = attribute;
-      const defaultValue = attribute.defaultValue === undefined ? undefined : format("%L", attribute.defaultValue);
+      const defaultValue = attribute.defaultValue === undefined ? (autoIncrement && fieldName === "id" ? `nextval('${tableName}_id_seq'::regclass)` : undefined) : this.escape(attribute.defaultValue);
       const [base, type] = this.fieldType(attribute);
       const where = "attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2";
 
@@ -215,8 +269,8 @@ export class PGDB extends DB {
         if(this.sync) await this.client.query(statement);
       };
 
-      const setNotNull = async (isNull: boolean) => {
-        if(isNull === notNull) return;
+      const setNotNull = async (isNotNull: boolean) => {
+        if(isNotNull === notNull) return;
 
         const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} ${notNull ? "SET" : "DROP"} NOT NULL`;
 
@@ -224,14 +278,14 @@ export class PGDB extends DB {
         if(this.sync) await this.client.query(statement);
       };
 
-      const setDefault = async (isNull: boolean) => {
+      const setDefault = async (isNotNull: boolean, create: boolean) => {
         if(defaultValue !== undefined) {
           let statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} SET DEFAULT ${defaultValue}`;
 
           this.syncLog(statement);
           if(this.sync) await this.client.query(statement);
 
-          if(isNull) {
+          if(! isNotNull && ! create) {
             statement = `UPDATE ${tableName} SET ${fieldName} = ${defaultValue} WHERE ${fieldName} IS NULL`;
 
             this.syncLog(statement);
@@ -239,12 +293,12 @@ export class PGDB extends DB {
           }
         }
 
-        await setNotNull(isNull);
+        await setNotNull(isNotNull);
       };
 
       if(! res.rowCount) {
         await addField();
-        await setDefault(false);
+        await setDefault(false, true);
       } else {
         const { adsrc, attnotnull, atttypmod, typname } = res.rows[0];
 
@@ -252,7 +306,7 @@ export class PGDB extends DB {
           if(needDrop.filter(([type, name]) => attribute.type === type && typname === name).length) {
             await this.dropField(tableName, fieldName);
             await addField();
-            await setDefault(false);
+            await setDefault(false, true);
           } else {
             if(adsrc) dropDefault();
 
@@ -261,12 +315,12 @@ export class PGDB extends DB {
 
             this.syncLog(statement);
             if(this.sync) await this.client.query(statement);
-            await setDefault(attnotnull);
+            await setDefault(attnotnull, false);
           }
         } else if(defaultValue === undefined) {
           if(adsrc) dropDefault();
           await setNotNull(attnotnull);
-        } else if(! adsrc || adsrc.split("::")[0] !== defaultValue) await setDefault(attnotnull);
+        } else if(! adsrc || this.defaultNeq(adsrc, defaultValue)) await setDefault(attnotnull, false);
       }
     }
   }
@@ -356,4 +410,6 @@ export class PGDB extends DB {
   }
 }
 
-// farray[0].defaultValue = "nextval('" + tname + "_id_seq'::regclass)";
+class TransactionPG extends Transaction {
+  client: PoolClient = {} as PoolClient;
+}

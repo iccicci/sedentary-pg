@@ -1,14 +1,14 @@
 import { EntryBase, ForeignKeyOptions, Natural, Sedentary, SedentaryOptions, Type } from "sedentary";
-import { Attribute } from "sedentary/lib/db";
+import { Attribute } from "sedentary/db";
 import { PoolConfig } from "pg";
 
-import { PGDB } from "./lib/pgdb";
+import { PGDB } from "./pgdb";
 
 export { EntryBase, SedentaryOptions, Type } from "sedentary";
 
 export class SedentaryPG extends Sedentary {
   constructor(connection: PoolConfig, options?: SedentaryOptions) {
-    super("", options);
+    super(options);
 
     if(! (connection instanceof Object)) throw new Error("SedentaryPG.constructor: 'connection' argument: Wrong type, expected 'Object'");
 

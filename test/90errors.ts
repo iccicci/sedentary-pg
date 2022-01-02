@@ -97,4 +97,14 @@ describe("errors", () => {
       class test1 extends db.model("test1", { a: db.INT }) {}
       db.model("test", { a: db.FKEY(test1.a) });
     })("Sedentary.FKEY: 'test1' model: 'a' attribute: is not unique: can't be used as FKEY target"));
+
+  describe("SedentaryPG.escape(null)", () =>
+    errorHelper(db => {
+      db.escape(null as never);
+    })("SedentaryPG: Can't escape null nor undefined values; use the 'IS NULL' operator instead"));
+
+  describe("SedentaryPG.escape(undefined)", () =>
+    errorHelper(db => {
+      db.escape(undefined as never);
+    })("SedentaryPG: Can't escape null nor undefined values; use the 'IS NULL' operator instead"));
 });
