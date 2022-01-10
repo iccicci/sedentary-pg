@@ -4,6 +4,7 @@ if(! process.env.SPG) throw "Missing SPG!";
 
 const v10 = process.version.startsWith("v10");
 
+export const checkDB = true;
 export const connection = JSON.parse(process.env.SPG);
 
 export const wrongConnection = { host: "none.nodomain.none" };
@@ -337,7 +338,7 @@ export const expected = {
 };
 
 export const models = {
-  insert: [
+  base: [
     "CREATE SEQUENCE test1_id_seq",
     "CREATE TABLE test1 ()",
     "ALTER TABLE test1 ADD COLUMN id INTEGER",
@@ -349,7 +350,49 @@ export const models = {
     "ALTER TABLE test1 ALTER COLUMN b SET NOT NULL",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
     "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
-    "INSERT INTO test1 (a,b) VALUES (23,'ok')",
-    "INSERT INTO test1 DEFAULT VALUES"
+    "INSERT INTO test1 (a, b) VALUES (23, 'ok')",
+    "INSERT INTO test1 DEFAULT VALUES",
+    "SELECT *, tableoid FROM test1 WHERE b = 'ok'",
+    "SELECT *, tableoid FROM test1 WHERE a IS NULL",
+    "SELECT *, tableoid FROM test1 WHERE id < 23 ORDER BY id",
+    "SELECT *, tableoid FROM test1 ORDER BY id DESC",
+    "SELECT *, tableoid FROM test1 WHERE b = 'ok'",
+    "UPDATE test1 SET b = 'test' WHERE id = 1",
+    "SELECT *, tableoid FROM test1 WHERE b IN ('a', 'b', 'test') ORDER BY id"
+  ],
+  inheritance: [
+    "CREATE SEQUENCE test1_id_seq",
+    "CREATE TABLE test1 ()",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER",
+    "ALTER TABLE test1 ALTER COLUMN id SET DEFAULT nextval('test1_id_seq'::regclass)",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test1 ADD COLUMN a INTEGER",
+    "ALTER TABLE test1 ADD COLUMN b VARCHAR",
+    "ALTER TABLE test1 ALTER COLUMN b SET DEFAULT 'test'",
+    "ALTER TABLE test1 ALTER COLUMN b SET NOT NULL",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
+    "CREATE TABLE test2 () INHERITS (test1)",
+    "ALTER TABLE test2 ADD COLUMN c INTEGER",
+    "ALTER TABLE test2 ALTER COLUMN c SET DEFAULT 23",
+    "ALTER TABLE test2 ALTER COLUMN c SET NOT NULL",
+    "ALTER TABLE test2 ADD COLUMN d TIMESTAMP (3) WITH TIME ZONE",
+    "CREATE TABLE test3 () INHERITS (test2)",
+    "ALTER TABLE test3 ADD COLUMN e INTEGER",
+    "ALTER TABLE test3 ADD COLUMN f VARCHAR",
+    "INSERT INTO test1 (a) VALUES (23)",
+    "SELECT *, tableoid FROM test1 WHERE id = 1",
+    "UPDATE test1 SET b = 'ok' WHERE id = 1",
+    "INSERT INTO test2 (a, d) VALUES (23, '1976-01-23 14:00:00+00')",
+    "SELECT *, tableoid FROM test1 WHERE id <= 2 ORDER BY id DESC",
+    "SELECT *, tableoid FROM test2 WHERE id IN (2)",
+    "UPDATE test2 SET b = 'ok' WHERE id = 2",
+    "INSERT INTO test3 (a, e, f) VALUES (23, 23, 'test')",
+    "SELECT *, tableoid FROM test1 ORDER BY id",
+    "SELECT *, tableoid FROM test2 WHERE id IN (2)",
+    "SELECT *, tableoid FROM test3 WHERE id IN (3)",
+    "UPDATE test1 SET a = 0 WHERE id = 1",
+    "UPDATE test2 SET b = 'no', c = 0 WHERE id = 2",
+    "UPDATE test3 SET a = 0, b = 'no', c = 0, e = 0, f = 'no' WHERE id = 3"
   ]
 };

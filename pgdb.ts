@@ -1,6 +1,6 @@
 import { DatabaseError, Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { Attribute, DB, ForeignKeyActions, Index, Natural, Table, Transaction } from "sedentary/db";
+import { Attribute, DB, EntryBase, ForeignKeyActions, Index, Natural, Table, Transaction } from "sedentary/db";
 import { adsrc } from "./adsrc";
 
 const needDrop = [
@@ -22,6 +22,7 @@ const actions: { [k in ForeignKeyActions]: string } = { cascade: "c", "no action
 export class PGDB extends DB {
   private client: PoolClient;
   private indexes: string[];
+  private oidLoad: Record<number, (ids: Natural[]) => Promise<EntryBase[]>> = {};
   private pool: Pool;
   private version: number;
 
@@ -43,7 +44,7 @@ export class PGDB extends DB {
   }
 
   async end(): Promise<void> {
-    this.client.release();
+    if(this.client.release) this.client.release();
     await this.pool.end();
   }
 
@@ -51,6 +52,14 @@ export class PGDB extends DB {
     if(src === value) return false;
 
     return src.split("::")[0] !== value;
+  }
+
+  async begin() {
+    const ret = new TransactionPG(await this.pool.connect());
+
+    await ret.client.query("BEGIN");
+
+    return ret;
   }
 
   escape(value: Natural): string {
@@ -65,52 +74,122 @@ export class PGDB extends DB {
     return format("%L", JSON.stringify(value));
   }
 
-  fill(attributes: Attribute<Natural, unknown>[], row: Record<string, Natural>, entity: Record<string, Natural>) {
-    for(const attribute of attributes) entity[attribute.attributeName] = row[attribute.fieldName];
+  fill(attributes: Record<string, string>, row: Record<string, Natural>, entry: Record<string, Natural>) {
+    const loaded: Record<string, Natural> = {};
+
+    for(const attribute in attributes) entry[attribute] = loaded[attribute] = row[attributes[attribute]];
+    Object.defineProperty(entry, "loaded", { configurable: true, value: loaded });
   }
 
-  save(tableName: string, attributes: Attribute<Natural, unknown>[]): (this: Record<string, Natural> & { loaded?: Record<string, unknown>; tx?: TransactionPG }) => Promise<boolean> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
+  load(
+    tableName: string,
+    attributes: Record<string, string>,
+    pk: Attribute<Natural, unknown>,
+    model: new (from: "load") => EntryBase,
+    table: Table
+  ): (where: string, order?: string[], tx?: Transaction) => Promise<EntryBase[]> {
+    const pkFldName = pk.fieldName;
 
-    return async function() {
-      const client = this.tx ? this.tx.client : await self.pool.connect();
+    return async (where: string, order?: string[], tx?: Transaction) => {
+      const { oid } = table;
+      const ret: EntryBase[] = [];
+      const client = tx ? (tx as TransactionPG).client : await this.pool.connect();
+      const oidPK: Record<number, [number, Natural][]> = {};
 
-      if(! this.loaded) {
-        const fields: string[] = [];
-        const values: string[] = [];
+      try {
+        const query = `SELECT *, tableoid FROM ${tableName}${where ? ` WHERE ${where}` : ""}${
+          order && order.length ? ` ORDER BY ${order.map(_ => (_.startsWith("-") ? `${_.substring(1)} DESC` : _)).join(",")}` : ""
+        }`;
 
-        for(const attribute of attributes) {
-          const value = this[attribute.attributeName];
+        this.log(query);
+        const res = await client.query(query);
 
-          if(value !== null && value !== undefined) {
-            fields.push(attribute.fieldName);
-            values.push(self.escape(this[attribute.attributeName]));
+        for(const row of res.rows) {
+          if(row.tableoid === oid) {
+            const entry = new model("load") as EntryBase & Record<string, Natural>;
+
+            this.fill(attributes, row, entry);
+
+            ret.push(entry);
+            entry.postLoad();
+          } else {
+            if(! oidPK[row.tableoid]) oidPK[row.tableoid] = [];
+            oidPK[row.tableoid].push([ret.length, row[pkFldName]]);
+            ret.push(null as unknown as EntryBase);
           }
         }
 
-        const query = fields.length ? `INSERT INTO ${tableName} (${fields.join(",")}) VALUES (${values.join(",")})` : `INSERT INTO ${tableName} DEFAULT VALUES`;
+        for(const oid in oidPK) {
+          const res = await this.oidLoad[oid](oidPK[oid].map(_ => _[1]));
 
-        try {
+          for(const entry of res) for(const [id] of oidPK[oid]) ret[id] = entry;
+        }
+      } finally {
+        if(! tx) client.release();
+      }
+
+      return ret;
+    };
+  }
+
+  save(
+    tableName: string,
+    attributes: Record<string, string>,
+    pk: Attribute<Natural, unknown>
+  ): (this: Record<string, Natural> & { loaded?: Record<string, unknown>; tx?: TransactionPG }) => Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    const pkAttrnName = pk.attributeName;
+    const pkFldName = pk.fieldName;
+
+    return async function() {
+      let changed = false;
+      const client = this.tx ? this.tx.client : await self.pool.connect();
+
+      try {
+        const { loaded } = this;
+
+        if(loaded) {
+          const actions: string[] = [];
+
+          for(const attribute in attributes) {
+            const value = this[attribute];
+
+            if(value !== loaded[attribute]) actions.push(`${attributes[attribute]} = ${self.escape(value)}`);
+          }
+
+          if(actions.length) {
+            const query = `UPDATE ${tableName} SET ${actions.join(", ")} WHERE ${pkFldName} = ${self.escape(this[pkAttrnName])}`;
+
+            self.log(query);
+            self.fill(attributes, (await client.query(query + " RETURNING *")).rows[0], this);
+            changed = true;
+          }
+        } else {
+          const fields: string[] = [];
+          const values: string[] = [];
+
+          for(const attribute in attributes) {
+            const value = this[attribute];
+
+            if(value !== null && value !== undefined) {
+              fields.push(attributes[attribute]);
+              values.push(self.escape(value));
+            }
+          }
+
+          const query = fields.length ? `INSERT INTO ${tableName} (${fields.join(", ")}) VALUES (${values.join(", ")})` : `INSERT INTO ${tableName} DEFAULT VALUES`;
+
           self.log(query);
           self.fill(attributes, (await client.query(query + " RETURNING *")).rows[0], this);
-        } finally {
-          if(! this.tx) client.release();
+
+          changed = true;
         }
-
-        return true;
+      } finally {
+        if(! this.tx) client.release();
       }
 
-      let changed = false;
-      const { loaded } = this;
-
-      for(const key in this) {
-        if(typeof this[key] === "object") {
-          if(JSON.stringify(this[key]) !== JSON.stringify(loaded[key])) changed = true;
-        } else if(this[key] !== loaded[key]) changed = true;
-      }
-
-      return Promise.resolve(changed);
+      return changed;
     };
   }
 
@@ -219,6 +298,12 @@ export class PGDB extends DB {
         if(this.sync) await this.client.query(statement);
       }
     }
+  }
+
+  async syncDataBase(): Promise<void> {
+    await super.syncDataBase();
+
+    for(const table of this.tables) this.oidLoad[table.oid || 0] = (ids: Natural[]) => table.model.load({ [table.pk.attributeName]: ["IN", ids] });
   }
 
   fieldType(attribute: Attribute<Natural, unknown>): string[] {
@@ -410,6 +495,36 @@ export class PGDB extends DB {
   }
 }
 
-class TransactionPG extends Transaction {
-  client: PoolClient = {} as PoolClient;
+export class TransactionPG extends Transaction {
+  client: PoolClient;
+  released = false;
+
+  constructor(client: PoolClient) {
+    super();
+    this.client = client;
+  }
+
+  private release() {
+    this.released = true;
+    this.client.release();
+  }
+
+  async commit() {
+    if(! this.released) {
+      await this.client.query("COMMIT");
+      this.release();
+      super.commit();
+    }
+  }
+
+  async rollback() {
+    try {
+      if(! this.released) {
+        super.rollback();
+        await this.client.query("ROLLBACK");
+      }
+    } finally {
+      if(! this.released) this.release();
+    }
+  }
 }
