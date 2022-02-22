@@ -19,7 +19,7 @@ const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", timestamptz: 
 
 const actions: { [k in ForeignKeyActions]: string } = { cascade: "c", "no action": "a", restrict: "r", "set default": "d", "set null": "n" };
 
-export class PGDB extends DB {
+export class PGDB extends DB<TransactionPG> {
   private client: PoolClient;
   private indexes: string[];
   private oidLoad: Record<number, (ids: Natural[]) => Promise<EntryBase[]>> = {};

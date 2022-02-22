@@ -7,7 +7,7 @@ import { PGDB, TransactionPG } from "./pgdb";
 export { EntryBase, SedentaryOptions, Type } from "sedentary";
 export { TransactionPG } from "./pgdb";
 
-export class SedentaryPG extends Sedentary {
+export class SedentaryPG extends Sedentary<PGDB, TransactionPG> {
   constructor(connection: PoolConfig, options?: SedentaryOptions) {
     super(options);
 
