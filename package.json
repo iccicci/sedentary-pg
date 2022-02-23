@@ -44,6 +44,8 @@
     "sqlite"
   ],
   "license": "MIT",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/es/index.js",
   "name": "sedentary-pg",
   "prettier": {
     "arrowParens": "avoid",
@@ -62,15 +64,13 @@
     "packagejson": "node -r ts-node/register utils.ts packagejson",
     "test": "mocha -r ts-node/register test/*ts",
     "travis": "node -r ts-node/register utils.ts travis",
-    "tsc": "tsc --declaration",
+    "tsc": "tsc -p tsconfig.cjs.json && tsc -p tsconfig.es.json && tsc -p tsconfig.types.json",
     "version": "node -r ts-node/register utils.ts version"
   },
   "tsd": {
     "compilerOptions": {
       "alwaysStrict": true,
-      "declaration": true,
       "esModuleInterop": true,
-      "module": "commonjs",
       "noImplicitAny": true,
       "noImplicitReturns": true,
       "noImplicitThis": true,
@@ -78,10 +78,9 @@
       "strictBindCallApply": true,
       "strictFunctionTypes": true,
       "strictNullChecks": true,
-      "strictPropertyInitialization": true,
-      "target": "es2017"
+      "strictPropertyInitialization": true
     }
   },
-  "types": "index.d.ts",
+  "types": "./dist/types/index.d.ts",
   "version": "0.0.25"
 }
