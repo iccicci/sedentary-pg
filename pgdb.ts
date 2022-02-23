@@ -1,6 +1,6 @@
 import { DatabaseError, Pool, PoolClient, PoolConfig } from "pg";
 import format from "pg-format";
-import { Attribute, DB, EntryBase, ForeignKeyActions, Index, Natural, Table, Transaction } from "sedentary/db";
+import { Attribute, DB, EntryBase, ForeignKeyActions, Index, Natural, Table, Transaction } from "sedentary";
 import { adsrc } from "./adsrc";
 
 const needDrop = [

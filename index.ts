@@ -1,5 +1,4 @@
-import { EntryBase, ForeignKeyOptions, Natural, Sedentary, SedentaryOptions, Type } from "sedentary";
-import { Attribute } from "sedentary/db";
+import { Attribute, EntryBase, ForeignKeyOptions, Natural, Sedentary, SedentaryOptions, Type } from "sedentary";
 import { PoolConfig } from "pg";
 
 import { PGDB, TransactionPG } from "./pgdb";
