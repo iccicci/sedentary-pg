@@ -71,6 +71,7 @@
     "compilerOptions": {
       "alwaysStrict": true,
       "esModuleInterop": true,
+      "moduleResolution": "node",
       "noImplicitAny": true,
       "noImplicitReturns": true,
       "noImplicitThis": true,
