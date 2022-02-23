@@ -9,7 +9,7 @@
     "@types/pg": "8.6.4",
     "pg": "8.7.3",
     "pg-format": "1.0.4",
-    "sedentary": "0.0.28"
+    "sedentary": "0.0.29"
   },
   "description": "The ORM which never needs to migrate - PostgreSQL",
   "devDependencies": {
@@ -79,9 +79,10 @@
       "strictBindCallApply": true,
       "strictFunctionTypes": true,
       "strictNullChecks": true,
-      "strictPropertyInitialization": true
+      "strictPropertyInitialization": true,
+      "target": "esnext"
     }
   },
   "types": "./dist/types/index.d.ts",
-  "version": "0.0.28"
+  "version": "0.0.29"
 }
