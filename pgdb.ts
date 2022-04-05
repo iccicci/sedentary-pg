@@ -44,7 +44,7 @@ export class PGDB extends DB<TransactionPG> {
   }
 
   async end(): Promise<void> {
-    if(this.client.release) this.client.release();
+    this.client.release();
     await this.pool.end();
   }
 
@@ -55,7 +55,7 @@ export class PGDB extends DB<TransactionPG> {
   }
 
   async begin() {
-    const ret = new TransactionPG(await this.pool.connect());
+    const ret = new TransactionPG(this.log, await this.pool.connect());
 
     await ret.client.query("BEGIN");
 
@@ -69,9 +69,9 @@ export class PGDB extends DB<TransactionPG> {
 
     if(type === "number" || type === "boolean") return value.toString();
     if(type === "string") return format("%L", value);
-    if(value instanceof Date) return format("%L", value).replace(/\.\d\d\d\+/, "+");
-
-    return format("%L", JSON.stringify(value));
+    //if(value instanceof Date)
+    return format("%L", value).replace(/\.\d\d\d\+/, "+");
+    //return format("%L", JSON.stringify(value));
   }
 
   fill(attributes: Record<string, string>, row: Record<string, Natural>, entry: Record<string, Natural>) {
@@ -90,16 +90,16 @@ export class PGDB extends DB<TransactionPG> {
   ): (where: string, order?: string[], tx?: Transaction) => Promise<EntryBase[]> {
     const pkFldName = pk.fieldName;
 
-    return async (where: string, order?: string[], tx?: Transaction) => {
+    return async (where: string, order?: string[], tx?: Transaction, lock?: boolean) => {
       const { oid } = table;
       const ret: EntryBase[] = [];
       const client = tx ? (tx as TransactionPG).client : await this.pool.connect();
       const oidPK: Record<number, [number, Natural][]> = {};
 
       try {
-        const query = `SELECT *, tableoid FROM ${tableName}${where ? ` WHERE ${where}` : ""}${
-          order && order.length ? ` ORDER BY ${order.map(_ => (_.startsWith("-") ? `${_.substring(1)} DESC` : _)).join(",")}` : ""
-        }`;
+        const forUpdate = lock ? " FOR UPDATE" : "";
+        const orderBy = order && order.length ? ` ORDER BY ${order.map(_ => (_.startsWith("-") ? `${_.substring(1)} DESC` : _)).join(",")}` : "";
+        const query = `SELECT *, tableoid FROM ${tableName}${where ? ` WHERE ${where}` : ""}${orderBy}${forUpdate}`;
 
         this.log(query);
         const res = await client.query(query);
@@ -110,6 +110,7 @@ export class PGDB extends DB<TransactionPG> {
 
             this.fill(attributes, row, entry);
 
+            if(tx) tx.addEntry(entry);
             ret.push(entry);
             entry.postLoad();
           } else {
@@ -122,7 +123,7 @@ export class PGDB extends DB<TransactionPG> {
         for(const oid in oidPK) {
           const res = await this.oidLoad[oid](oidPK[oid].map(_ => _[1]));
 
-          for(const entry of res) for(const [id] of oidPK[oid]) ret[id] = entry;
+          for(const entry of res) for(const [id, pk] of oidPK[oid]) if(pk === (entry as unknown as Record<string, Natural>)[pkFldName]) ret[id] = entry;
         }
       } finally {
         if(! tx) client.release();
@@ -499,8 +500,8 @@ export class TransactionPG extends Transaction {
   client: PoolClient;
   released = false;
 
-  constructor(client: PoolClient) {
-    super();
+  constructor(log: (message: string) => void, client: PoolClient) {
+    super(log);
     this.client = client;
   }
 
@@ -511,6 +512,7 @@ export class TransactionPG extends Transaction {
 
   async commit() {
     if(! this.released) {
+      this.log("COMMIT");
       await this.client.query("COMMIT");
       this.release();
       super.commit();
@@ -521,6 +523,7 @@ export class TransactionPG extends Transaction {
     try {
       if(! this.released) {
         super.rollback();
+        this.log("ROLLBACK");
         await this.client.query("ROLLBACK");
       }
     } finally {

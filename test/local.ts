@@ -4,8 +4,9 @@ if(! process.env.SPG) throw "Missing SPG!";
 
 const v10 = process.version.startsWith("v10");
 
-export const checkDB = true;
 export const connection = JSON.parse(process.env.SPG);
+
+export const packageName = "sedentary-pg" as string;
 
 export const wrongConnection = { host: "none.nodomain.none" };
 export const wrongConnectionError = `getaddrinfo ENOTFOUND none.nodomain.none${v10 ? " none.nodomain.none:5432" : ""}`;
@@ -388,11 +389,72 @@ export const models = {
     "SELECT *, tableoid FROM test2 WHERE id IN (2)",
     "UPDATE test2 SET b = 'ok' WHERE id = 2",
     "INSERT INTO test3 (a, e, f) VALUES (23, 23, 'test')",
+    "INSERT INTO test2 (a, b, d) VALUES (23, 'no', '1976-01-23 14:00:00+00')",
     "SELECT *, tableoid FROM test1 ORDER BY id",
-    "SELECT *, tableoid FROM test2 WHERE id IN (2)",
+    "SELECT *, tableoid FROM test2 WHERE id IN (2, 4)",
     "SELECT *, tableoid FROM test3 WHERE id IN (3)",
     "UPDATE test1 SET a = 0 WHERE id = 1",
     "UPDATE test2 SET b = 'no', c = 0 WHERE id = 2",
-    "UPDATE test3 SET a = 0, b = 'no', c = 0, e = 0, f = 'no' WHERE id = 3"
+    "UPDATE test3 SET a = 0, b = 'no', c = 0, e = 0, f = 'no' WHERE id = 3",
+    "UPDATE test2 SET c = 0 WHERE id = 4"
+  ]
+};
+
+export const transactions = {
+  commit: [
+    "CREATE SEQUENCE test2_id_seq",
+    "CREATE TABLE test2 ()",
+    "ALTER TABLE test2 ADD COLUMN id INTEGER",
+    "ALTER TABLE test2 ALTER COLUMN id SET DEFAULT nextval('test2_id_seq'::regclass)",
+    "ALTER TABLE test2 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test2 ADD COLUMN a INTEGER",
+    "ALTER TABLE test2 ADD COLUMN b VARCHAR",
+    "ALTER SEQUENCE test2_id_seq OWNED BY test2.id",
+    "ALTER TABLE test2 ADD CONSTRAINT test2_id_unique UNIQUE(id)",
+    "INSERT INTO test2 (a, b) VALUES (1, '1')",
+    "SELECT *, tableoid FROM test2",
+    "UPDATE test2 SET a = 11, b = '11' WHERE id = 1",
+    "INSERT INTO test2 (a, b) VALUES (2, '2')",
+    "COMMIT",
+    "SELECT *, tableoid FROM test2 ORDER BY id"
+  ],
+  locks: [
+    "CREATE SEQUENCE test1_id_seq",
+    "CREATE TABLE test1 ()",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER",
+    "ALTER TABLE test1 ALTER COLUMN id SET DEFAULT nextval('test1_id_seq'::regclass)",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test1 ADD COLUMN a INTEGER",
+    "ALTER TABLE test1 ADD COLUMN b VARCHAR",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
+    "INSERT INTO test1 (a, b) VALUES (1, '1')",
+    "INSERT INTO test1 (a, b) VALUES (2, '2')",
+    "SELECT *, tableoid FROM test1 WHERE a = 1 FOR UPDATE",
+    "SELECT *, tableoid FROM test1 WHERE a = 2 FOR UPDATE",
+    "SELECT *, tableoid FROM test1 WHERE a = 1 FOR UPDATE",
+    "SELECT *, tableoid FROM test1 WHERE a = 2 FOR UPDATE",
+    "UPDATE test1 SET b = '3' WHERE id = 1",
+    "COMMIT",
+    "UPDATE test1 SET b = '4' WHERE id = 2",
+    "COMMIT",
+    "ROLLBACK"
+  ],
+  rollback: [
+    "CREATE SEQUENCE test3_id_seq",
+    "CREATE TABLE test3 ()",
+    "ALTER TABLE test3 ADD COLUMN id INTEGER",
+    "ALTER TABLE test3 ALTER COLUMN id SET DEFAULT nextval('test3_id_seq'::regclass)",
+    "ALTER TABLE test3 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test3 ADD COLUMN a INTEGER",
+    "ALTER TABLE test3 ADD COLUMN b VARCHAR",
+    "ALTER SEQUENCE test3_id_seq OWNED BY test3.id",
+    "ALTER TABLE test3 ADD CONSTRAINT test3_id_unique UNIQUE(id)",
+    "INSERT INTO test3 (a, b) VALUES (1, '1')",
+    "SELECT *, tableoid FROM test3 FOR UPDATE",
+    "UPDATE test3 SET a = 11, b = '11' WHERE id = 1",
+    "INSERT INTO test3 (a, b) VALUES (2, '2')",
+    "ROLLBACK",
+    "SELECT *, tableoid FROM test3 ORDER BY id"
   ]
 };
