@@ -3,7 +3,7 @@ import { PoolConfig } from "pg";
 
 import { PGDB, TransactionPG } from "./pgdb";
 
-export { EntryBase, SedentaryOptions, Type } from "sedentary";
+export { Entry, EntryBase, SedentaryOptions, Type } from "sedentary";
 export { TransactionPG } from "./pgdb";
 
 export class SedentaryPG extends Sedentary<PGDB, TransactionPG> {
