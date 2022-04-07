@@ -9,7 +9,7 @@
     "@types/pg": "8.6.5",
     "pg": "8.7.3",
     "pg-format": "1.0.4",
-    "sedentary": "0.0.31"
+    "sedentary": "0.0.32"
   },
   "description": "The ORM which never needs to migrate - PostgreSQL",
   "devDependencies": {
@@ -84,5 +84,5 @@
     }
   },
   "types": "./dist/types/index.d.ts",
-  "version": "0.0.31"
+  "version": "0.0.32"
 }

@@ -133,6 +133,29 @@ export class PGDB extends DB<TransactionPG> {
     };
   }
 
+  remove(tableName: string, pk: Attribute<Natural, unknown>): (this: Record<string, Natural> & { tx?: TransactionPG }) => Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+    const pkAttrnName = pk.attributeName;
+    const pkFldName = pk.fieldName;
+
+    return async function() {
+      const client = this.tx ? this.tx.client : await self.pool.connect();
+      let removed = false;
+
+      try {
+        const query = `DELETE FROM ${tableName} WHERE ${pkFldName} = ${self.escape(this[pkAttrnName])}`;
+
+        self.log(query);
+        removed = (await client.query(query)).rowCount === 1;
+      } finally {
+        if(! this.tx) client.release();
+      }
+
+      return removed;
+    };
+  }
+
   save(
     tableName: string,
     attributes: Record<string, string>,
@@ -144,8 +167,8 @@ export class PGDB extends DB<TransactionPG> {
     const pkFldName = pk.fieldName;
 
     return async function() {
-      let changed = false;
       const client = this.tx ? this.tx.client : await self.pool.connect();
+      let changed = false;
 
       try {
         const { loaded } = this;

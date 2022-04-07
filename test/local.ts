@@ -359,7 +359,9 @@ export const models = {
     "SELECT *, tableoid FROM test1 ORDER BY id DESC",
     "SELECT *, tableoid FROM test1 WHERE b = 'ok'",
     "UPDATE test1 SET b = 'test' WHERE id = 1",
-    "SELECT *, tableoid FROM test1 WHERE b IN ('a', 'b', 'test') ORDER BY id"
+    "SELECT *, tableoid FROM test1 WHERE b IN ('a', 'b', 'test') ORDER BY id",
+    "DELETE FROM test1 WHERE id = 1",
+    "DELETE FROM test1 WHERE id = 1"
   ],
   inheritance: [
     "CREATE SEQUENCE test1_id_seq",
@@ -396,7 +398,8 @@ export const models = {
     "UPDATE test1 SET a = 0 WHERE id = 1",
     "UPDATE test2 SET b = 'no', c = 0 WHERE id = 2",
     "UPDATE test3 SET a = 0, b = 'no', c = 0, e = 0, f = 'no' WHERE id = 3",
-    "UPDATE test2 SET c = 0 WHERE id = 4"
+    "UPDATE test2 SET c = 0 WHERE id = 4",
+    "DELETE FROM test3 WHERE id = 3"
   ]
 };
 
@@ -412,9 +415,11 @@ export const transactions = {
     "ALTER SEQUENCE test2_id_seq OWNED BY test2.id",
     "ALTER TABLE test2 ADD CONSTRAINT test2_id_unique UNIQUE(id)",
     "INSERT INTO test2 (a, b) VALUES (1, '1')",
+    "INSERT INTO test2 (a, b) VALUES (2, '2')",
     "SELECT *, tableoid FROM test2",
     "UPDATE test2 SET a = 11, b = '11' WHERE id = 1",
-    "INSERT INTO test2 (a, b) VALUES (2, '2')",
+    "DELETE FROM test2 WHERE id = 2",
+    "INSERT INTO test2 (a, b) VALUES (3, '3')",
     "COMMIT",
     "SELECT *, tableoid FROM test2 ORDER BY id"
   ],
@@ -451,9 +456,11 @@ export const transactions = {
     "ALTER SEQUENCE test3_id_seq OWNED BY test3.id",
     "ALTER TABLE test3 ADD CONSTRAINT test3_id_unique UNIQUE(id)",
     "INSERT INTO test3 (a, b) VALUES (1, '1')",
+    "INSERT INTO test3 (a, b) VALUES (2, '2')",
     "SELECT *, tableoid FROM test3 FOR UPDATE",
     "UPDATE test3 SET a = 11, b = '11' WHERE id = 1",
-    "INSERT INTO test3 (a, b) VALUES (2, '2')",
+    "DELETE FROM test3 WHERE id = 2",
+    "INSERT INTO test3 (a, b) VALUES (3, '3')",
     "ROLLBACK",
     "SELECT *, tableoid FROM test3 ORDER BY id"
   ]
