@@ -1,4 +1,4 @@
-import { DatabaseError, Pool, PoolClient, PoolConfig } from "pg";
+import { DatabaseError, Pool, PoolClient, PoolConfig, types as PGtypes } from "pg";
 import format from "pg-format";
 import { Attribute, DB, EntryBase, ForeignKeyActions, Index, Natural, Table, Transaction } from "sedentary";
 import { adsrc } from "./adsrc";
@@ -18,6 +18,12 @@ const needUsing = [
 const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", timestamptz: "DATETIME", varchar: "VARCHAR" };
 
 const actions: { [k in ForeignKeyActions]: string } = { cascade: "c", "no action": "a", restrict: "r", "set default": "d", "set null": "n" };
+
+function parseInt8(value: string) {
+  return BigInt(value);
+}
+
+PGtypes.setTypeParser(20, parseInt8);
 
 export class PGDB extends DB<TransactionPG> {
   private client: PoolClient;

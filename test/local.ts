@@ -400,6 +400,21 @@ export const models = {
     "UPDATE test3 SET a = 0, b = 'no', c = 0, e = 0, f = 'no' WHERE id = 3",
     "UPDATE test2 SET c = 0 WHERE id = 4",
     "DELETE FROM test3 WHERE id = 3"
+  ],
+  types: [
+    "CREATE SEQUENCE test1_id_seq",
+    "CREATE TABLE test1 ()",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER",
+    "ALTER TABLE test1 ALTER COLUMN id SET DEFAULT nextval('test1_id_seq'::regclass)",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test1 ADD COLUMN a INTEGER",
+    "ALTER TABLE test1 ADD COLUMN b VARCHAR",
+    "ALTER TABLE test1 ADD COLUMN c TIMESTAMP (3) WITH TIME ZONE",
+    "ALTER TABLE test1 ADD COLUMN d BIGINT",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
+    "INSERT INTO test1 (a, b, c, d) VALUES (23, 'ok', '1976-01-23 00:00:00+00', '23')",
+    "SELECT *, tableoid FROM test1"
   ]
 };
 
