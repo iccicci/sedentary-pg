@@ -24,7 +24,12 @@ function parseInt8(value: string) {
   return BigInt(value);
 }
 
+function parseNumber(value: string) {
+  return parseFloat(value);
+}
+
 PGtypes.setTypeParser(20, parseInt8);
+PGtypes.setTypeParser(1700, parseNumber);
 
 export class PGDB extends DB<TransactionPG> {
   private client: PoolClient;

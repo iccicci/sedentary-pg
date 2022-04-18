@@ -424,9 +424,10 @@ export const models = {
     "ALTER TABLE test1 ADD COLUMN b VARCHAR",
     "ALTER TABLE test1 ADD COLUMN c TIMESTAMP (3) WITH TIME ZONE",
     "ALTER TABLE test1 ADD COLUMN d BIGINT",
+    "ALTER TABLE test1 ADD COLUMN e NUMERIC",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
     "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
-    "INSERT INTO test1 (a, b, c, d) VALUES (23, 'ok', '1976-01-23 00:00:00+00', '23')",
+    "INSERT INTO test1 (a, b, c, d, e) VALUES (23, 'ok', '1976-01-23 00:00:00+00', '23', 2.3)",
     "SELECT *, tableoid FROM test1"
   ]
 };
