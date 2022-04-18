@@ -282,10 +282,23 @@ export const expected = {
     "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
     "CREATE INDEX ia ON test1 USING btree (a)"
   ],
-  sync_index_2:   ["CREATE INDEX ib ON test1 USING btree (a, b)"],
-  sync_index_3:   ["DROP INDEX ia", "DROP INDEX ib", "CREATE INDEX ia ON test1 USING hash (a)", "CREATE UNIQUE INDEX ib ON test1 USING btree (a, b)"],
-  sync_index_4:   ["DROP INDEX ia", "DROP INDEX ib", "CREATE INDEX ia ON test1 USING btree (a, b)", "CREATE UNIQUE INDEX ib ON test1 USING btree (b, a)"],
-  types_datetime: [
+  sync_index_2:  ["CREATE INDEX ib ON test1 USING btree (a, b)"],
+  sync_index_3:  ["DROP INDEX ia", "DROP INDEX ib", "CREATE INDEX ia ON test1 USING hash (a)", "CREATE UNIQUE INDEX ib ON test1 USING btree (a, b)"],
+  sync_index_4:  ["DROP INDEX ia", "DROP INDEX ib", "CREATE INDEX ia ON test1 USING btree (a, b)", "CREATE UNIQUE INDEX ib ON test1 USING btree (b, a)"],
+  types_boolean: [
+    "CREATE SEQUENCE test1_id_seq",
+    "CREATE TABLE test1 ()",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER",
+    "ALTER TABLE test1 ALTER COLUMN id SET DEFAULT nextval('test1_id_seq'::regclass)",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test1 ADD COLUMN a BOOL",
+    "ALTER TABLE test1 ADD COLUMN b BOOL",
+    "ALTER TABLE test1 ADD COLUMN c VARCHAR",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)"
+  ],
+  types_boolean_changes: ["ALTER TABLE test1 ALTER COLUMN b TYPE VARCHAR", "ALTER TABLE test1 ALTER COLUMN c TYPE BOOL USING c::BOOL"],
+  types_datetime:        [
     "CREATE SEQUENCE test1_id_seq",
     "CREATE TABLE test1 ()",
     "ALTER TABLE test1 ADD COLUMN id INTEGER",
@@ -425,9 +438,10 @@ export const models = {
     "ALTER TABLE test1 ADD COLUMN c TIMESTAMP (3) WITH TIME ZONE",
     "ALTER TABLE test1 ADD COLUMN d BIGINT",
     "ALTER TABLE test1 ADD COLUMN e NUMERIC",
+    "ALTER TABLE test1 ADD COLUMN f BOOL",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
     "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
-    "INSERT INTO test1 (a, b, c, d, e) VALUES (23, 'ok', '1976-01-23 00:00:00+00', '23', 2.3)",
+    "INSERT INTO test1 (a, b, c, d, e, f) VALUES (23, 'ok', '1976-01-23 00:00:00+00', '23', 2.3, true)",
     "SELECT *, tableoid FROM test1"
   ]
 };

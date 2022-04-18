@@ -83,7 +83,7 @@ describe("data types", () => {
   });
 
   describe("BOOLEAN", function() {
-    helper(expected.types_number, async db => {
+    helper(expected.types_boolean, async db => {
       db.model("test1", {
         a: db.BOOLEAN,
         b: db.BOOLEAN,
@@ -93,7 +93,7 @@ describe("data types", () => {
     });
 
     describe("BOOLEAN changes", function() {
-      helper(expected.types_number_changes, true, async db => {
+      helper(expected.types_boolean_changes, true, async db => {
         db.model("test1", {
           a: db.BOOLEAN,
           b: db.VARCHAR,
