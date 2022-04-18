@@ -13,9 +13,10 @@ const needDrop = [
 const needUsing = [
   ["DATETIME", "varchar"],
   ["INT", "varchar"],
-  ["INT8", "varchar"]
+  ["INT8", "varchar"],
+  ["NUMBER", "varchar"]
 ];
-const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", timestamptz: "DATETIME", varchar: "VARCHAR" };
+const types = { int2: "SMALLINT", int4: "INTEGER", int8: "BIGINT", numeric: "NUMERIC", timestamptz: "DATETIME", varchar: "VARCHAR" };
 
 const actions: { [k in ForeignKeyActions]: string } = { cascade: "c", "no action": "a", restrict: "r", "set default": "d", "set null": "n" };
 
@@ -343,6 +344,8 @@ export class PGDB extends DB<TransactionPG> {
     switch(type) {
     case "DATETIME":
       return ["DATETIME", "TIMESTAMP (3) WITH TIME ZONE"];
+    case "NUMBER":
+      return ["NUMERIC", "NUMERIC"];
     case "INT":
       ret = size === 2 ? "SMALLINT" : "INTEGER";
 

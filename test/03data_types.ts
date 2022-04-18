@@ -17,7 +17,7 @@ describe("data types", () => {
       await db.connect();
     });
 
-    describe("INT & VARCHAR changes", function() {
+    describe("INT & VARCHAR", function() {
       helper(expected.types_int_change, true, async db => {
         db.model("test1", {
           a: db.INT(),
@@ -54,6 +54,28 @@ describe("data types", () => {
           d: db.INT8,
           e: db.DATETIME,
           f: { defaultValue: new Date("1976-01-23T14:00:00.000Z"), type: db.DATETIME() }
+        });
+        await db.connect();
+      });
+    });
+  });
+
+  describe("NUMBER", function() {
+    helper(expected.types_number, async db => {
+      db.model("test1", {
+        a: db.NUMBER,
+        b: db.NUMBER,
+        c: db.VARCHAR
+      });
+      await db.connect();
+    });
+
+    describe("NUMBER changes", function() {
+      helper(expected.types_number_changes, true, async db => {
+        db.model("test1", {
+          a: db.NUMBER,
+          b: db.VARCHAR,
+          c: db.NUMBER
         });
         await db.connect();
       });

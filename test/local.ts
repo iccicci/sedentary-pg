@@ -310,7 +310,20 @@ export const expected = {
     "ALTER TABLE test1 DROP COLUMN e",
     "ALTER TABLE test1 ADD COLUMN e TIMESTAMP (3) WITH TIME ZONE"
   ],
-  types_int: [
+  types_number: [
+    "CREATE SEQUENCE test1_id_seq",
+    "CREATE TABLE test1 ()",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER",
+    "ALTER TABLE test1 ALTER COLUMN id SET DEFAULT nextval('test1_id_seq'::regclass)",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test1 ADD COLUMN a NUMERIC",
+    "ALTER TABLE test1 ADD COLUMN b NUMERIC",
+    "ALTER TABLE test1 ADD COLUMN c VARCHAR",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)"
+  ],
+  types_number_changes: ["ALTER TABLE test1 ALTER COLUMN b TYPE VARCHAR", "ALTER TABLE test1 ALTER COLUMN c TYPE NUMERIC USING c::NUMERIC"],
+  types_int:            [
     "CREATE SEQUENCE test1_id_seq",
     "CREATE TABLE test1 ()",
     "ALTER TABLE test1 ADD COLUMN id INTEGER",
