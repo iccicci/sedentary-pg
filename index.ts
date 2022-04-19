@@ -26,6 +26,10 @@ export class SedentaryPG extends Sedentary<PGDB, TransactionPG> {
   public async begin(): Promise<TransactionPG> {
     return (this.db as PGDB).begin();
   }
+
+  public async client() {
+    return (this.db as PGDB).client();
+  }
 }
 
 export const Package = SedentaryPG;

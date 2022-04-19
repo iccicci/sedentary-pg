@@ -34,6 +34,43 @@ export async function clean(): Promise<void> {
   await pool.end();
 }
 
+export const client = {
+  simple: [
+    "CREATE SEQUENCE test1_id_seq",
+    "CREATE TABLE test1 ()",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER",
+    "ALTER TABLE test1 ALTER COLUMN id SET DEFAULT nextval('test1_id_seq'::regclass)",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test1 ADD COLUMN a INTEGER",
+    "ALTER TABLE test1 ADD COLUMN b VARCHAR",
+    "ALTER TABLE test1 ADD COLUMN c TIMESTAMP (3) WITH TIME ZONE",
+    "ALTER TABLE test1 ADD COLUMN d BIGINT",
+    "ALTER TABLE test1 ADD COLUMN e NUMERIC",
+    "ALTER TABLE test1 ADD COLUMN f BOOL",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
+    "INSERT INTO test1 (a, b, c, d, e, f) VALUES (23, 'ok', '1976-01-23 00:00:00+00', '23', 2.3, true)"
+  ],
+  transaction: [
+    "CREATE SEQUENCE test1_id_seq",
+    "CREATE TABLE test1 ()",
+    "ALTER TABLE test1 ADD COLUMN id INTEGER",
+    "ALTER TABLE test1 ALTER COLUMN id SET DEFAULT nextval('test1_id_seq'::regclass)",
+    "ALTER TABLE test1 ALTER COLUMN id SET NOT NULL",
+    "ALTER TABLE test1 ADD COLUMN a INTEGER",
+    "ALTER TABLE test1 ADD COLUMN b VARCHAR",
+    "ALTER TABLE test1 ADD COLUMN c TIMESTAMP (3) WITH TIME ZONE",
+    "ALTER TABLE test1 ADD COLUMN d BIGINT",
+    "ALTER TABLE test1 ADD COLUMN e NUMERIC",
+    "ALTER TABLE test1 ADD COLUMN f BOOL",
+    "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
+    "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
+    "INSERT INTO test1 (a, b, c, d, e, f) VALUES (23, 'ok', '1976-01-23 00:00:00+00', '23', 2.3, true)",
+    "BEGIN",
+    "ROLLBACK"
+  ]
+};
+
 export const dryrun = {
   dryrun: [
     "NOT SYNCING: ALTER TABLE test1 DROP CONSTRAINT test1_c_unique CASCADE",
@@ -459,6 +496,7 @@ export const transactions = {
     "ALTER TABLE test2 ADD CONSTRAINT test2_id_unique UNIQUE(id)",
     "INSERT INTO test2 (a, b) VALUES (1, '1')",
     "INSERT INTO test2 (a, b) VALUES (2, '2')",
+    "BEGIN",
     "SELECT *, tableoid FROM test2",
     "UPDATE test2 SET a = 11, b = '11' WHERE id = 1",
     "DELETE FROM test2 WHERE id = 2",
@@ -478,6 +516,9 @@ export const transactions = {
     "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
     "INSERT INTO test1 (a, b) VALUES (1, '1')",
     "INSERT INTO test1 (a, b) VALUES (2, '2')",
+    "BEGIN",
+    "BEGIN",
+    "BEGIN",
     "SELECT *, tableoid FROM test1 WHERE a = 1 FOR UPDATE",
     "SELECT *, tableoid FROM test1 WHERE a = 2 FOR UPDATE",
     "SELECT *, tableoid FROM test1 WHERE a = 1 FOR UPDATE",
@@ -500,6 +541,7 @@ export const transactions = {
     "ALTER TABLE test3 ADD CONSTRAINT test3_id_unique UNIQUE(id)",
     "INSERT INTO test3 (a, b) VALUES (1, '1')",
     "INSERT INTO test3 (a, b) VALUES (2, '2')",
+    "BEGIN",
     "SELECT *, tableoid FROM test3 FOR UPDATE",
     "UPDATE test3 SET a = 11, b = '11' WHERE id = 1",
     "DELETE FROM test3 WHERE id = 2",

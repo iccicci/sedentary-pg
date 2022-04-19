@@ -33,31 +33,29 @@ PGtypes.setTypeParser(20, parseInt8);
 PGtypes.setTypeParser(1700, parseNumber);
 
 export class PGDB extends DB<TransactionPG> {
-  private client: PoolClient;
-  private indexes: string[];
+  private _client: PoolClient = {} as PoolClient;
+  private indexes: string[] = [];
   private oidLoad: Record<number, (ids: Natural[]) => Promise<EntryBase[]>> = {};
   private pool: Pool;
-  private version: number;
+  private released = false;
+  private version = 0;
 
   constructor(connection: PoolConfig, log: (message: string) => void) {
     super(log);
 
-    this.client = {} as PoolClient;
-    this.indexes = [];
     this.pool = new Pool(connection);
-    this.version = 0;
   }
 
   async connect(): Promise<void> {
-    this.client = await this.pool.connect();
+    this._client = await this.pool.connect();
 
-    const res = await this.client.query("SELECT version()");
+    const res = await this._client.query("SELECT version()");
 
     this.version = parseInt(res.rows[0].version.split(" ")[1].split(".")[0], 10);
   }
 
   async end(): Promise<void> {
-    this.client.release();
+    if(! this.released) this._client.release();
     await this.pool.end();
   }
 
@@ -70,9 +68,14 @@ export class PGDB extends DB<TransactionPG> {
   async begin() {
     const ret = new TransactionPG(this.log, await this.pool.connect());
 
-    await ret.client.query("BEGIN");
+    this.log("BEGIN");
+    await (ret as unknown as { _client: PoolClient })._client.query("BEGIN");
 
     return ret;
+  }
+
+  async client() {
+    return await this.pool.connect();
   }
 
   escape(value: Natural): string {
@@ -106,7 +109,7 @@ export class PGDB extends DB<TransactionPG> {
     return async (where: string, order?: string[], tx?: Transaction, lock?: boolean) => {
       const { oid } = table;
       const ret: EntryBase[] = [];
-      const client = tx ? (tx as TransactionPG).client : await this.pool.connect();
+      const client = tx ? (tx as unknown as { _client: PoolClient })._client : await this.pool.connect();
       const oidPK: Record<number, [number, Natural][]> = {};
 
       try {
@@ -153,7 +156,7 @@ export class PGDB extends DB<TransactionPG> {
     const pkFldName = pk.fieldName;
 
     return async function() {
-      const client = this.tx ? this.tx.client : await self.pool.connect();
+      const client = this.tx ? (this.tx as unknown as { _client: PoolClient })._client : await self.pool.connect();
       let removed = false;
 
       try {
@@ -180,7 +183,7 @@ export class PGDB extends DB<TransactionPG> {
     const pkFldName = pk.fieldName;
 
     return async function() {
-      const client = this.tx ? this.tx.client : await self.pool.connect();
+      const client = this.tx ? (this.tx as unknown as { _client: PoolClient })._client : await self.pool.connect();
       let changed = false;
 
       try {
@@ -232,7 +235,7 @@ export class PGDB extends DB<TransactionPG> {
 
   async dropConstraints(table: Table): Promise<number[]> {
     const indexes: number[] = [];
-    const res = await this.client.query("SELECT confdeltype, confupdtype, conindid, conname, contype FROM pg_constraint WHERE conrelid = $1 ORDER BY conname", [table.oid]);
+    const res = await this._client.query("SELECT confdeltype, confupdtype, conindid, conname, contype FROM pg_constraint WHERE conrelid = $1 ORDER BY conname", [table.oid]);
 
     for(const row of res.rows) {
       const arr = table.constraints.filter(_ => _.constraintName === row.conname && _.type === row.contype);
@@ -250,7 +253,7 @@ export class PGDB extends DB<TransactionPG> {
         const statement = `ALTER TABLE ${table.tableName} DROP CONSTRAINT ${row.conname} CASCADE`;
 
         this.syncLog(statement);
-        if(this.sync) await this.client.query(statement);
+        if(this.sync) await this._client.query(statement);
       }
     }
 
@@ -261,11 +264,11 @@ export class PGDB extends DB<TransactionPG> {
     const statement = `ALTER TABLE ${tableName} DROP COLUMN ${fieldName}`;
 
     this.syncLog(statement);
-    if(this.sync) await this.client.query(statement);
+    if(this.sync) await this._client.query(statement);
   }
 
   async dropFields(table: Table): Promise<void> {
-    const res = await this.client.query("SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND attisdropped = false AND attinhcount = 0", [table.oid]);
+    const res = await this._client.query("SELECT attname FROM pg_attribute WHERE attrelid = $1 AND attnum > 0 AND attisdropped = false AND attinhcount = 0", [table.oid]);
 
     for(const i in res.rows) if(! table.findField(res.rows[i].attname)) await this.dropField(table.tableName, res.rows[i].attname);
   }
@@ -273,7 +276,7 @@ export class PGDB extends DB<TransactionPG> {
   async dropIndexes(table: Table, constraintIndexes: number[]): Promise<void> {
     const { indexes, oid } = table;
     const iobject: { [key: string]: Index } = {};
-    const res = await this.client.query(
+    const res = await this._client.query(
       "SELECT amname, attname, indexrelid, indisunique, relname FROM pg_class, pg_index, pg_attribute, pg_am WHERE indrelid = $1 AND indexrelid = pg_class.oid AND attrelid = pg_class.oid AND relam = pg_am.oid ORDER BY attnum",
       [oid]
     );
@@ -301,14 +304,14 @@ export class PGDB extends DB<TransactionPG> {
       const statement = `DROP INDEX ${index}`;
 
       this.syncLog(statement);
-      if(this.sync) await this.client.query(statement);
+      if(this.sync) await this._client.query(statement);
     }
   }
 
   async syncConstraints(table: Table): Promise<void> {
     for(const constraint of table.constraints) {
       const { attribute, constraintName, type } = constraint;
-      const res = await this.client.query("SELECT attname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1] AND attname = $2", [
+      const res = await this._client.query("SELECT attname FROM pg_attribute, pg_constraint WHERE attrelid = $1 AND conrelid = $1 AND attnum = conkey[1] AND attname = $2", [
         table.oid,
         attribute.fieldName
       ]);
@@ -332,15 +335,22 @@ export class PGDB extends DB<TransactionPG> {
         const statement = `ALTER TABLE ${table.tableName} ADD CONSTRAINT ${constraintName} ${query}`;
 
         this.syncLog(statement);
-        if(this.sync) await this.client.query(statement);
+        if(this.sync) await this._client.query(statement);
       }
     }
   }
 
   async syncDataBase(): Promise<void> {
-    await super.syncDataBase();
+    try {
+      await super.syncDataBase();
 
-    for(const table of this.tables) this.oidLoad[table.oid || 0] = (ids: Natural[]) => table.model.load({ [table.pk.attributeName]: ["IN", ids] });
+      for(const table of this.tables) this.oidLoad[table.oid || 0] = (ids: Natural[]) => table.model.load({ [table.pk.attributeName]: ["IN", ids] });
+    } catch(e) {
+      throw e;
+    } finally {
+      this.released = true;
+      this._client.release();
+    }
   }
 
   fieldType(attribute: Attribute<Natural, unknown>): string[] {
@@ -375,7 +385,7 @@ export class PGDB extends DB<TransactionPG> {
       const [base, type] = this.fieldType(attribute);
       const where = "attrelid = $1 AND attnum > 0 AND atttypid = pg_type.oid AND attislocal = 't' AND attname = $2";
 
-      const res = await this.client.query(
+      const res = await this._client.query(
         `SELECT attnotnull, atttypmod, typname, ${adsrc(this.version)} FROM pg_type, pg_attribute LEFT JOIN pg_attrdef ON adrelid = attrelid AND adnum = attnum WHERE ${where}`,
         [oid, fieldName]
       );
@@ -384,14 +394,14 @@ export class PGDB extends DB<TransactionPG> {
         const statement = `ALTER TABLE ${tableName} ADD COLUMN ${fieldName} ${type}`;
 
         this.syncLog(statement);
-        if(this.sync) await this.client.query(statement);
+        if(this.sync) await this._client.query(statement);
       };
 
       const dropDefault = async () => {
         const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} DROP DEFAULT`;
 
         this.syncLog(statement);
-        if(this.sync) await this.client.query(statement);
+        if(this.sync) await this._client.query(statement);
       };
 
       const setNotNull = async (isNotNull: boolean) => {
@@ -400,7 +410,7 @@ export class PGDB extends DB<TransactionPG> {
         const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} ${notNull ? "SET" : "DROP"} NOT NULL`;
 
         this.syncLog(statement);
-        if(this.sync) await this.client.query(statement);
+        if(this.sync) await this._client.query(statement);
       };
 
       const setDefault = async (isNotNull: boolean, create: boolean) => {
@@ -408,13 +418,13 @@ export class PGDB extends DB<TransactionPG> {
           let statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} SET DEFAULT ${defaultValue}`;
 
           this.syncLog(statement);
-          if(this.sync) await this.client.query(statement);
+          if(this.sync) await this._client.query(statement);
 
           if(! isNotNull && ! create) {
             statement = `UPDATE ${tableName} SET ${fieldName} = ${defaultValue} WHERE ${fieldName} IS NULL`;
 
             this.syncLog(statement);
-            if(this.sync) this.client.query(statement);
+            if(this.sync) this._client.query(statement);
           }
         }
 
@@ -439,7 +449,7 @@ export class PGDB extends DB<TransactionPG> {
             const statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} TYPE ${type}${using}`;
 
             this.syncLog(statement);
-            if(this.sync) await this.client.query(statement);
+            if(this.sync) await this._client.query(statement);
             await setDefault(attnotnull, false);
           }
         } else if(defaultValue === undefined) {
@@ -460,7 +470,7 @@ export class PGDB extends DB<TransactionPG> {
         const statement = `CREATE${unique ? " UNIQUE" : ""} INDEX ${indexName} ON ${tableName} USING ${type} (${fields.join(", ")})`;
 
         this.syncLog(statement);
-        if(this.sync) await this.client.query(statement);
+        if(this.sync) await this._client.query(statement);
       }
     }
   }
@@ -471,21 +481,21 @@ export class PGDB extends DB<TransactionPG> {
     const statement = `ALTER SEQUENCE ${table.tableName}_id_seq OWNED BY ${table.tableName}.id`;
 
     this.syncLog(statement);
-    if(this.sync) await this.client.query(statement);
+    if(this.sync) await this._client.query(statement);
   }
 
   async syncTable(table: Table): Promise<void> {
     if(table.autoIncrement) {
       await (async () => {
         try {
-          await this.client.query(`SELECT currval('${table.tableName}_id_seq')`);
+          await this._client.query(`SELECT currval('${table.tableName}_id_seq')`);
         } catch(e) {
           if(e instanceof DatabaseError && e.code === "55000") return;
           if(e instanceof DatabaseError && e.code === "42P01") {
             const statement = `CREATE SEQUENCE ${table.tableName}_id_seq`;
 
             this.syncLog(statement);
-            if(this.sync) await this.client.query(statement);
+            if(this.sync) await this._client.query(statement);
             table.autoIncrementOwn = true;
 
             return;
@@ -497,13 +507,13 @@ export class PGDB extends DB<TransactionPG> {
     }
 
     let create = false;
-    const resTable = await this.client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
+    const resTable = await this._client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
 
     if(resTable.rowCount) {
       table.oid = resTable.rows[0].oid;
 
       let drop = false;
-      const resParent = await this.client.query("SELECT inhparent FROM pg_inherits WHERE inhrelid = $1", [table.oid]);
+      const resParent = await this._client.query("SELECT inhparent FROM pg_inherits WHERE inhrelid = $1", [table.oid]);
 
       if(resParent.rowCount) {
         if(! table.parent) drop = true;
@@ -517,7 +527,7 @@ export class PGDB extends DB<TransactionPG> {
 
         create = true;
         this.syncLog(statement);
-        if(this.sync) await this.client.query(statement);
+        if(this.sync) await this._client.query(statement);
       }
     } else create = true;
 
@@ -526,9 +536,9 @@ export class PGDB extends DB<TransactionPG> {
       const statement = `CREATE TABLE ${table.tableName} ()${parent}`;
 
       this.syncLog(statement);
-      if(this.sync) await this.client.query(statement);
+      if(this.sync) await this._client.query(statement);
 
-      const resTable = await this.client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
+      const resTable = await this._client.query("SELECT oid FROM pg_class WHERE relname = $1", [table.tableName]);
 
       table.oid = resTable.rows[0]?.oid;
     }
@@ -536,34 +546,38 @@ export class PGDB extends DB<TransactionPG> {
 }
 
 export class TransactionPG extends Transaction {
-  client: PoolClient;
-  released = false;
+  private _client: PoolClient;
+  private released = false;
 
   constructor(log: (message: string) => void, client: PoolClient) {
     super(log);
-    this.client = client;
+    this._client = client;
+  }
+
+  public async client() {
+    return this._client;
   }
 
   private release() {
     this.released = true;
-    this.client.release();
+    this._client.release();
   }
 
-  async commit() {
+  public async commit() {
     if(! this.released) {
       this.log("COMMIT");
-      await this.client.query("COMMIT");
+      await this._client.query("COMMIT");
       this.release();
       super.commit();
     }
   }
 
-  async rollback() {
+  public async rollback() {
     try {
       if(! this.released) {
         super.rollback();
         this.log("ROLLBACK");
-        await this.client.query("ROLLBACK");
+        await this._client.query("ROLLBACK");
       }
     } finally {
       if(! this.released) this.release();

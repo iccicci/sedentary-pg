@@ -56,7 +56,7 @@ describe("errors", () => {
       const [db, ddb] = pgdb();
 
       ddb.connect = async function(): Promise<void> {
-        this.client = {
+        this._client = {
           query: async (): Promise<void> => {
             throw new Error("test");
           },
