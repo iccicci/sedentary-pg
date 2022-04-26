@@ -195,6 +195,7 @@ export const expected = {
     "ALTER TABLE test1 ALTER COLUMN d SET NOT NULL",
     "ALTER TABLE test1 ADD COLUMN f INTEGER",
     "ALTER TABLE test1 ADD COLUMN h INTEGER",
+    "ALTER TABLE test1 ADD COLUMN i INTEGER",
     "ALTER SEQUENCE test1_id_seq OWNED BY test1.id",
     "ALTER TABLE test1 ADD CONSTRAINT test1_id_unique UNIQUE(id)",
     "ALTER TABLE test1 ADD CONSTRAINT test1_a_unique UNIQUE(a)"
@@ -212,6 +213,9 @@ export const expected = {
     "ALTER TABLE test1 ALTER COLUMN d SET DEFAULT '42'",
     "ALTER TABLE test1 ALTER COLUMN f TYPE BIGINT",
     "ALTER TABLE test1 ALTER COLUMN f SET NOT NULL",
+    "ALTER TABLE test1 ALTER COLUMN i SET DEFAULT 23",
+    "UPDATE test1 SET i = 23 WHERE i IS NULL",
+    "ALTER TABLE test1 ALTER COLUMN i SET NOT NULL",
     "ALTER TABLE test1 ADD CONSTRAINT test1_b_unique UNIQUE(b)"
   ],
   sync_foreign_keys_1: [
