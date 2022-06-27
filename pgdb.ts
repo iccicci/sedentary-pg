@@ -413,14 +413,14 @@ export class PGDB extends DB<TransactionPG> {
         if(this.sync) await this._client.query(statement);
       };
 
-      const setDefault = async (isNotNull: boolean, create: boolean) => {
+      const setDefault = async (isNotNull: boolean) => {
         if(defaultValue !== undefined) {
           let statement = `ALTER TABLE ${tableName} ALTER COLUMN ${fieldName} SET DEFAULT ${defaultValue}`;
 
           this.syncLog(statement);
           if(this.sync) await this._client.query(statement);
 
-          if(! isNotNull && ! create) {
+          if(notNull && ! isNotNull) {
             statement = `UPDATE ${tableName} SET ${fieldName} = ${defaultValue} WHERE ${fieldName} IS NULL`;
 
             this.syncLog(statement);
@@ -433,7 +433,7 @@ export class PGDB extends DB<TransactionPG> {
 
       if(! res.rowCount) {
         await addField();
-        await setDefault(false, true);
+        await setDefault(false);
       } else {
         const { adsrc, attnotnull, atttypmod, typname } = res.rows[0];
 
@@ -441,7 +441,7 @@ export class PGDB extends DB<TransactionPG> {
           if(needDrop.filter(([type, name]) => attribute.type === type && typname === name).length) {
             await this.dropField(tableName, fieldName);
             await addField();
-            await setDefault(false, true);
+            await setDefault(false);
           } else {
             if(adsrc) dropDefault();
 
@@ -450,12 +450,12 @@ export class PGDB extends DB<TransactionPG> {
 
             this.syncLog(statement);
             if(this.sync) await this._client.query(statement);
-            await setDefault(attnotnull, false);
+            await setDefault(attnotnull);
           }
         } else if(defaultValue === undefined) {
           if(adsrc) dropDefault();
           await setNotNull(attnotnull);
-        } else if(! adsrc || this.defaultNeq(adsrc, defaultValue)) await setDefault(attnotnull, false);
+        } else if(! adsrc || this.defaultNeq(adsrc, defaultValue)) await setDefault(attnotnull);
       }
     }
   }
