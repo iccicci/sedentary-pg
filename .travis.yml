@@ -21,6 +21,7 @@ env:
     - PG_VERSION=10
 language: node_js
 node_js:
+  - '18'
   - '16'
   - '14'
 script: 'npm run coverage'
