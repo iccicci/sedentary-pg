@@ -1,5 +1,5 @@
 after_script:
-  - 'if [[ `node --version` =~ ^v16 && $PG_VERSION == 14 ]] ; then ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT ; fi'
+  - 'if [[ `node --version` =~ ^v18 && $PG_VERSION == 14 ]] ; then ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT ; fi'
 before_install:
   - 'sudo service postgresql stop'
   - 'sudo service postgresql restart $PG_VERSION'
@@ -10,6 +10,7 @@ before_script:
   - 'psql -c "CREATE DATABASE sedentary;" -U postgres'
   - 'psql -c "ALTER DATABASE sedentary SET timezone TO ''GMT'';" -U postgres'
   - 'export SPG=''{"database":"sedentary","password":"postgres","user":"postgres"}'''
+dist: focal
 env:
   global:
     - CC_TEST_REPORTER_ID=c7519657dfea145349c1b7a98f7134f033c25f598b40ad5b077744eb4beb7c66
