@@ -103,10 +103,10 @@ export class PGDB extends DB<TransactionPG> {
     pk: Attribute<Natural, unknown>,
     model: new (from: "load") => EntryBase,
     table: Table
-  ): (where: string, order?: string[], tx?: Transaction) => Promise<EntryBase[]> {
+  ): (where: string, order?: string | string[], limit?: number, tx?: Transaction) => Promise<EntryBase[]> {
     const pkFldName = pk.fieldName;
 
-    return async (where: string, order?: string[], tx?: Transaction, lock?: boolean) => {
+    return async (where: string, order?: string | string[], limit?: number, tx?: Transaction, lock?: boolean) => {
       const { oid } = table;
       const ret: EntryBase[] = [];
       const client = tx ? (tx as unknown as { _client: PoolClient })._client : await this.pool.connect();
@@ -114,8 +114,9 @@ export class PGDB extends DB<TransactionPG> {
 
       try {
         const forUpdate = lock ? " FOR UPDATE" : "";
-        const orderBy = order && order.length ? ` ORDER BY ${order.map(_ => (_.startsWith("-") ? `${_.substring(1)} DESC` : _)).join(",")}` : "";
-        const query = `SELECT *, tableoid FROM ${tableName}${where ? ` WHERE ${where}` : ""}${orderBy}${forUpdate}`;
+        const orderBy = order && order.length ? ` ORDER BY ${(typeof order === "string" ? [order] : order).map(_ => (_.startsWith("-") ? `${_.substring(1)} DESC` : _)).join(",")}` : "";
+        const limitTo = typeof limit === "number" ? ` LIMIT ${limit}` : "";
+        const query = `SELECT *, tableoid FROM ${tableName}${where ? ` WHERE ${where}` : ""}${orderBy}${limitTo}${forUpdate}`;
 
         this.log(query);
         const res = await client.query(query);

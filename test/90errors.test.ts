@@ -20,7 +20,7 @@ describe("errors", () => {
   let err: Error;
 
   describe("SedentaryPG.constructor(connection)", () => {
-    before(async () => {
+    beforeAll(async () => {
       try {
         new SedentaryPG("" as never);
       } catch(e) {
@@ -32,7 +32,7 @@ describe("errors", () => {
   });
 
   describe("PGDB.sync", () => {
-    before(async () => {
+    beforeAll(async () => {
       const [db, ddb] = pgdb();
 
       ddb.syncTable = async function(): Promise<void> {
@@ -52,7 +52,7 @@ describe("errors", () => {
   });
 
   describe("PGDB.syncTable", () => {
-    before(async () => {
+    beforeAll(async () => {
       const [db, ddb] = pgdb();
 
       ddb.connect = async function(): Promise<void> {
@@ -76,7 +76,7 @@ describe("errors", () => {
   });
 
   describe("PGDB.syncField", () => {
-    before(async () => {
+    beforeAll(async () => {
       const [db] = pgdb();
 
       try {

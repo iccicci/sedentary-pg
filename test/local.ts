@@ -497,7 +497,8 @@ export const models = {
     "UPDATE test2 SET b = 'no', c = 0 WHERE id = 2",
     "UPDATE test3 SET a = 0, b = 'no', c = 0, e = 0, f = 'no' WHERE id = 3",
     "UPDATE test2 SET c = 0 WHERE id = 4",
-    "DELETE FROM test3 WHERE id = 3"
+    "DELETE FROM test3 WHERE id = 3",
+    "SELECT *, tableoid FROM test1 ORDER BY id LIMIT 1"
   ],
   types: [
     "CREATE SEQUENCE test1_id_seq",

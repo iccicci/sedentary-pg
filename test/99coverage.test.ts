@@ -6,7 +6,17 @@ import { helper } from "./helper";
 import { transactions } from "./local";
 
 describe("coverage", () => {
-  describe("release", function() {
+  describe("DB.release", function() {
+    helper([], true, { autoSync: false }, async db => {
+      await db.connect();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db as any).log("Syncing...");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db as any).log("Synced");
+    });
+  });
+
+  describe("Transaction.release", function() {
     helper(transactions.commit, async db => {
       const test2 = db.model("test2", { a: db.INT, b: db.VARCHAR });
       await db.connect();
