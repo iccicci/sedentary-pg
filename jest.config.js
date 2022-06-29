@@ -4,5 +4,5 @@ module.exports = {
   preset:                 "ts-jest",
   testEnvironment:        "jest-environment-node-single-context",
   testPathIgnorePatterns: ["/node_modules/"],
-  testSequencer:          "../testSequencer.js"
+  testSequencer:          "./testSequencer.js"
 };
